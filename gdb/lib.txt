@@ -1,0 +1,833 @@
+# GDB macros for use with Quagga.
+#
+# Macros in this file are not daemon specific. E.g., OS or FRR library
+# APIs.
+#
+# The macro file can be loaded with 'source <filename>'. They can then be
+# called by the user. Macros that explore more complicated structs generally
+# take pointer arguments.
+#
+# E.g.:
+# 
+# (gdb) source ~paul/code/frr/gdb/lib.txt
+# (gdb) break bgp_packet.c:613
+# Breakpoint 3 at 0x7fa883033a32: file bgp_packet.c, line 613.
+# (gdb) cont
+# ...
+# (gdb) cont
+# Breakpoint 3, bgp_write_packet (peer=0x7fa885199080) at bgp_packet.c:614
+# 614                     if (CHECK_FLAG (adv->path->peer->cap,PEER_CAP_RESTART_RCV)
+# (gdb) dump_prefix4  &adv->rn->p
+# IPv4:10.1.1.0/24
+# (gdb) dump_prefix  &adv->rn->p
+# IPv4:10.1.1.0/24
+#
+
+
+define def_ntohs
+ set $data = (char *)$arg0
+ set $i = 0
+ 
+ set $_  = $data[$i++] << 8
+ set $_ += $data[$i++]
+end
+document def_ntohs
+Read a 2-byte short at the given pointed to area as big-endian and 
+return it in $_
+
+Argument: Pointer to a 2-byte, big-endian short word.
+Returns: Integer value of that word in $_
+end
+
+define def_ntohl
+ set $data = (char *)$arg0
+ set $i = 0
+ 
+ set $_  = $data[$i++] << 24
+ set $_ += $data[$i++] << 16
+ set $_ += $data[$i++] << 8
+ set $_ += $data[$i++]
+end
+document def_ntohl
+Read a 4-byte integer at the given pointed to area as big-endian and 
+return it in $_
+
+Argument: Pointer to a big-endian 4-byte word.
+Returns: Integer value of that word in $_
+end
+
+# NB: This is in more complicated iterative form, rather than more
+# conventional and simpler recursive form, because GDB has a recursion limit
+# on macro calls (I think).
+define walk_route_table_next
+  # callee saves
+  set $_top = $top
+  set $_node = $node
+  set $_prevl = $prevl
+  
+  set $top = (struct route_node *)$arg0
+  set $node = (struct route_node *)$arg1
+  set $prevl = $node
+  
+  # first try left
+  #echo try left\n
+  set $node = $prevl->link[0]
+  
+  # otherwise try right
+  if ($node == 0)
+    #echo left null, try right\n
+    set $node = $prevl->link[1]
+  end
+  
+  # otherwise go up, till we find the first right that
+  # we havn't been to yet
+  if ($node == 0)
+    set $node = $prevl
+    while ($node != $top)
+       #echo right null, try up and right\n
+       
+       set $prevl = $node
+       set $parent = $node->parent
+       set $node = $parent->link[1]
+       
+       if ($node != 0 && $node != $prevl)
+         #echo found node \n
+         loop_break
+       end
+       
+       #echo go up\n
+       set $node = $parent       
+    end
+  end
+  
+  #printf "next node: 0x%x\n", $node
+  
+  set $_ = $node
+  
+  set $top = $_top
+  set $node = $_node
+  set $prevl = $_prevl
+end
+document walk_route_table_next
+Return the next node to visit in the given route_table (or subset of) and
+the given current node.
+
+Arguments:
+1st: (struct route_node *) to the top of the route_table to walk
+2nd: (struct route_node *) to the current node
+
+Returns: The (struct route_node *) for the next to visit in $_
+end
+
+define walk_route_table
+  set $_visited = $visited
+  set $_node = $node
+  set $top = $_top
+  
+  set $node = (struct route_node *)$arg0
+  set $top = (struct route_node *)$arg0
+  set $visited = 0
+  
+  while ($node != 0)
+    printf "Node: 0x%x", $node
+
+    if ($node->info != 0)
+      printf "\tinfo: 0x%x", $node->info
+      set $visited = $visited + 1
+    end
+    
+    printf "\n"
+    
+    walk_route_table_next $top $node
+    set $node = $_
+    
+    # we've gotten back to the top, finish
+    if ($node == $top)
+      set $node = 0
+    end
+  end
+  printf "Visited: %u\n", $visited
+  
+  set $top = $_top
+  set $visited = $_visited
+  set $node = $_node
+end
+
+document walk_route_table
+Walk through a routing table (or subset thereof) and dump all the non-null
+(struct route_node *)->info pointers.
+
+Argument: A lib/hread.h::(struct route_node *) pointing to the route_node
+under which all data should be dumped
+end
+
+define dump_timeval 
+  set $tv = (struct timeval *)$arg0
+  set $day = 3600*24
+  
+  if $tv->tv_sec > $day
+    printf "%d days, ", $tv->tv_sec / $day
+  end
+  if $tv->tv_sec > 3600
+    printf "%dh", $tv->tv_sec / 3600
+  end
+  if ($tv->tv_sec % 3600) > 60
+    printf "%dm", ($tv->tv_sec % 3600) / 60
+  end
+  printf "%d", $tv->tv_sec % 3600 % 60
+  if $tv->tv_usec != 0
+    printf ".%06d", $tv->tv_usec
+  end
+  printf "s"
+end
+document dump_timeval
+Human readable dump of a (struct timeval *) argument
+end
+
+define dump_s_addr
+  set $addr = (char *)$arg0
+  
+  printf "%d.%d.%d.%d", $addr[0], $addr[1], $addr[2], $addr[3]
+end
+
+define dump_s6_addr
+  set $a6 = (unsigned char *)$arg0
+  set $field = 0
+  
+  while ($field < 16)
+    set $i1 = $field++
+    set $i2 = $field++
+    
+    # Combine two bytes into a 16-bit value
+    set $value = ($a6[$i1] << 8) | $a6[$i2]
+    printf "%x", $value
+    
+    if ($field < 16)
+      printf ":"
+    end
+  end
+end
+document dump_s6_addr
+Interpret the memory starting at given address as an IPv6 s6_addr and
+print in human readable form.
+end
+
+define dump_prefix4
+  set $p = (struct prefix *) $arg0
+  echo IPv4:
+  dump_s_addr &($p->u.prefix4)
+  printf "/%d\n", $p->prefixlen
+end
+document dump_prefix4
+Textual dump of a (struct prefix4 *) argument.
+end
+
+define dump_prefix6
+  set $p = (struct prefix *) $arg0
+  echo IPv6:
+  dump_s6_addr &($p->u.prefix6)
+  printf "/%d\n", $p->prefixlen
+end
+document dump_prefix6
+Textual dump of a (struct prefix6 *) argument.
+end
+
+define dump_prefix
+  set $p = $arg0
+  
+  if ($p->family == 2)
+    dump_prefix4 $p
+  end
+  if ($p->family == 10)
+    dump_prefix6 $p
+  end
+end
+document dump_prefix
+Human readable dump of a (struct prefix *) argument.
+end
+
+define rn_next_down
+  set $node = $arg0
+  while ($node != 0)
+    print/x $node
+    if ($node->link[0] != 0)
+      set $node = $node->link[0]
+    else
+      set $node = $node->link[1]
+    end
+  end
+end
+
+document rn_next_down
+Walk left-down a given route table, dumping locations of route_nodes
+
+Argument: A single (struct route_node *).
+end
+
+define rn_next_up
+  set $top = (struct route_node *)$arg0
+  set $node = (struct route_node *)$arg1
+  
+  while ($node != $top)
+    echo walk up\n
+    
+    set $prevl = $node
+    set $parent = $node->parent
+    set $node = $parent->link[1]
+    
+    if ($node != 0 && $node != $prevl)
+      echo found a node\n
+      loop_break
+    end
+    
+    echo going up\n
+    set $node = $parent
+  end
+  output/x $node
+  echo \n
+end
+
+document rn_next_up
+Walk up-and-right from the given route_node to the next valid route_node
+which is not the given "top" route_node
+
+Arguments:
+1st: A (struct route_node *) to the top of the route table.
+2nd: The (struct route_node *) to walk up from
+end
+
+define mq_walk
+  set $mg = (struct memgroup *)$arg0
+
+  while ($mg)
+     printf "showing active allocations in memory group %s\n", $mg->name
+     set $mt = (struct memtype *)$mg->types
+     while ($mt)
+         printf "memstats: %s:%zu\n", $mt->name, $mt->n_alloc
+         set $mt = $mt->next
+     end
+     set $mg = $mg->next
+  end
+end
+
+document mq_walk
+Walk the memory data structures to show what is holding memory.
+
+Arguments:
+1st: A (struct memgroup *) where to start the walk.  If you are not
+     sure where to start pass it mg_first, which is a global DS for
+     all memory allocated in FRR
+end
+
+define __darr_meta
+  set $_ = ((struct darr_metadata *)$arg0) - 1
+end
+document __darr_meta
+Store a pointer to the struct darr_metadata in $_ for the given dynamic array.
+
+Argument: a pointer to a darr dynamic array.
+Returns: pointer to the struct darr_metadata in $_.
+end
+
+define darr_meta
+  __darr_meta $arg0
+  p *$_
+end
+document darr_meta
+Print the struct darr_metadata for the given dynamic array. Store the value
+in $_ as well.
+
+Argument: a pointer to a darr dynamic array.
+Returns: pointer to the struct darr_metadata in $_.
+end
+
+define darr_len
+  __darr_meta $arg0
+  set $_ = $_->len
+  p $_
+end
+document darr_len
+Print the length of the given dynamic array, and store in $_.
+
+Argument: a pointer to a darr dynamic array.
+Returns: length of the array.
+end
+
+define darr_cap
+  __darr_meta $arg0
+  set $_ = $_->cap
+  p $_
+end
+document darr_len
+Print the capacity of the given dynamic array, and store in $_.
+
+Argument: a pointer to a darr dynamic array.
+Returns: capacity of the array.
+end
+
+define dump_bgp_path_flags
+  set $flags = $arg0
+  
+  if ($flags & (1 << 0))
+    printf " IGP_CHANGED"
+  end
+  if ($flags & (1 << 1))
+    printf " DAMPED"
+  end
+  if ($flags & (1 << 2))
+    printf " HISTORY"
+  end
+  if ($flags & (1 << 3))
+    printf " SELECTED"
+  end
+  if ($flags & (1 << 4))
+    printf " VALID"
+  end
+  if ($flags & (1 << 5))
+    printf " ATTR_CHANGED"
+  end
+  if ($flags & (1 << 6))
+    printf " DMED_CHECK"
+  end
+  if ($flags & (1 << 7))
+    printf " DMED_SELECTED"
+  end
+  if ($flags & (1 << 8))
+    printf " STALE"
+  end
+  if ($flags & (1 << 9))
+    printf " REMOVED"
+  end
+  if ($flags & (1 << 10))
+    printf " COUNTED"
+  end
+  if ($flags & (1 << 11))
+    printf " MULTIPATH"
+  end
+  if ($flags & (1 << 12))
+    printf " MULTIPATH_CHG"
+  end
+  if ($flags & (1 << 13))
+    printf " RIB_ATTR_CHG"
+  end
+  if ($flags & (1 << 14))
+    printf " ANNC_NH_SELF"
+  end
+  if ($flags & (1 << 15))
+    printf " LINK_BW_CHG"
+  end
+  if ($flags & (1 << 16))
+    printf " ACCEPT_OWN"
+  end
+  if ($flags & (1 << 17))
+    printf " MPLSVPN_LABEL_NH"
+  end
+  if ($flags & (1 << 18))
+    printf " MPLSVPN_NH_LABEL_BIND"
+  end
+  if ($flags & (1 << 19))
+    printf " UNSORTED"
+  end
+  if ($flags & (1 << 20))
+    printf " MULTIPATH_NEW"
+  end
+end
+document dump_bgp_path_flags
+Print human-readable BGP path info flags.
+
+Argument: uint32_t flags value from bgp_path_info->flags
+end
+
+define dump_bgp_path_info
+  set $pi = (struct bgp_path_info *)$arg0
+  set $indent = ""
+  if ($argc > 1)
+    set $indent = $arg1
+  end
+  
+  printf "%s  bgp_path_info: 0x%lx\n", $indent, $pi
+  printf "%s    peer: 0x%lx", $indent, $pi->peer
+  if ($pi->peer != 0)
+    printf " (%s)", $pi->peer->host
+  end
+  printf "\n"
+  
+  printf "%s    type: %d, sub_type: %d", $indent, $pi->type, $pi->sub_type
+  if ($pi->sub_type == 0)
+    printf " (NORMAL)"
+  end
+  if ($pi->sub_type == 1)
+    printf " (STATIC)"
+  end
+  if ($pi->sub_type == 2)
+    printf " (AGGREGATE)"
+  end
+  if ($pi->sub_type == 3)
+    printf " (REDISTRIBUTE)"
+  end
+  if ($pi->sub_type == 5)
+    printf " (IMPORTED)"
+  end
+  printf "\n"
+  
+  printf "%s    flags: 0x%x", $indent, $pi->flags
+  dump_bgp_path_flags $pi->flags
+  printf "\n"
+  
+  printf "%s    uptime: %ld", $indent, $pi->uptime
+  printf ", lock: %d\n", $pi->lock
+  
+  if ($pi->attr != 0)
+    printf "%s    attr: 0x%lx", $indent, $pi->attr
+    printf " (nexthop: "
+    dump_s_addr &($pi->attr->nexthop)
+    printf ")\n"
+  end
+  
+  if ($pi->extra != 0)
+    printf "%s    extra: 0x%lx", $indent, $pi->extra
+    if ($pi->extra->labels != 0)
+      printf " [has labels]"
+    end
+    if ($pi->extra->evpn != 0)
+      printf " [has evpn]"
+    end
+    if ($pi->extra->vrfleak != 0)
+      printf " [has vrfleak]"
+    end
+    printf "\n"
+  end
+  
+  printf "%s    next: 0x%lx, prev: 0x%lx\n", $indent, $pi->next, $pi->prev
+end
+document dump_bgp_path_info
+Dump detailed information about a single bgp_path_info structure.
+
+Arguments:
+  1st: (struct bgp_path_info *) pointer to the path info to dump
+  2nd: (optional) string for indentation
+end
+
+define walk_bgp_table_subtree
+  # Internal helper to walk a single BGP table
+  # Args: bgp_table, indent_level, is_two_level
+  set $_btable = (struct bgp_table *)$arg0
+  set $_indent_level = $arg1
+  set $_is_two_level = $arg2
+  
+  if ($_btable == 0)
+    return
+  end
+  
+  set $_rt = $_btable->route_table
+  
+  if ($_rt == 0)
+    return
+  end
+  
+  set $_rn = ((struct route_table *)$_rt)->top
+  set $_top_node = $_rn
+  
+  if ($_rn == 0)
+    return
+  end
+  
+  # Iterate through all nodes using the standard route table walker
+  while ($_rn != 0)
+    set $_dest = 0
+    if ($_rn->info != 0)
+      set $_dest = (struct bgp_dest *)$_rn->info
+    end
+    
+    if ($_dest != 0)
+      if ($_dest->info != 0)
+      # Check if this is a two-level table (EVPN, MPLS VPN, ENCAP)
+      # In two-level tables, dest->info points to another bgp_table
+      if ($_is_two_level == 1)
+        set $_subtable = (struct bgp_table *)$_dest->info
+        printf "\n=== RD: "
+        
+        # RD is stored as a prefix, extract and display it
+        set $_rd_p = &((struct route_node *)$_rn)->p
+        set $_rd_bytes = (unsigned char *)&$_rd_p->u
+        
+        # RD format: 2 bytes type + 6 bytes value
+        # Type 0: 2-byte AS : 4-byte number
+        # Type 1: 4-byte IPv4 : 2-byte number (most common for EVPN)
+        # Type 2: 4-byte AS : 2-byte number
+        
+        set $_rd_type = ($_rd_bytes[0] << 8) | $_rd_bytes[1]
+        
+        if ($_rd_type == 1)
+          # Type 1: IPv4:number
+          printf "%d.%d.%d.%d:%d", $_rd_bytes[2], $_rd_bytes[3], $_rd_bytes[4], $_rd_bytes[5], ($_rd_bytes[6] << 8) | $_rd_bytes[7]
+        else
+          if ($_rd_type == 0)
+            # Type 0: AS:number
+            set $_rd_as = ($_rd_bytes[2] << 8) | $_rd_bytes[3]
+            set $_rd_num = ($_rd_bytes[4] << 24) | ($_rd_bytes[5] << 16) | ($_rd_bytes[6] << 8) | $_rd_bytes[7]
+            printf "%d:%d", $_rd_as, $_rd_num
+          else
+            if ($_rd_type == 2)
+              # Type 2: 4-byte AS:number
+              set $_rd_as = ($_rd_bytes[2] << 24) | ($_rd_bytes[3] << 16) | ($_rd_bytes[4] << 8) | $_rd_bytes[5]
+              set $_rd_num = ($_rd_bytes[6] << 8) | $_rd_bytes[7]
+              printf "%d:%d", $_rd_as, $_rd_num
+            else
+              # Unknown type, display raw
+              printf "%02x%02x:%02x%02x:%02x%02x:%02x%02x", $_rd_bytes[0], $_rd_bytes[1], $_rd_bytes[2], $_rd_bytes[3], $_rd_bytes[4], $_rd_bytes[5], $_rd_bytes[6], $_rd_bytes[7]
+            end
+          end
+        end
+        
+        printf " ===\n"
+        
+        # Recursively walk the sub-table
+        # Save parent state since GDB macros don't have local scope
+        if ($_subtable != 0)
+          set $_saved_rn = $_rn
+          set $_saved_top = $_top_node
+          set $_saved_is_two_level = $_is_two_level
+          set $_saved_indent = $_indent_level
+          walk_bgp_table_subtree $_subtable 1 0
+          # Restore parent state
+          set $_rn = $_saved_rn
+          set $_top_node = $_saved_top
+          set $_is_two_level = $_saved_is_two_level
+          set $_indent_level = $_saved_indent
+        end
+      else
+        # This is a regular table, dest->info points to bgp_path_info
+        set $_pi = (struct bgp_path_info *)$_dest->info
+        
+        set $_dest_count = $_dest_count + 1
+        
+        if ($_indent_level == 0)
+          printf "\n=== Dest #%d: 0x%lx ===\n", $_dest_count, $_dest
+        else
+          printf "\n  === Dest #%d: 0x%lx ===\n", $_dest_count, $_dest
+        end
+        
+        if ($_indent_level == 0)
+          printf "Prefix: "
+        else
+          printf "  Prefix: "
+        end
+        
+        # Check if this is an EVPN prefix (AF_EVPN = 47 on this system)
+        set $_p = &((struct route_node *)$_rn)->p
+        if ($_p->family == 47)
+          # EVPN prefix - decode the route type
+          set $_evpn_bytes = (unsigned char *)&$_p->u
+          set $_evpn_route_type = $_evpn_bytes[0]
+          
+          if ($_evpn_route_type == 2)
+            # Type 2: MAC/IP route - format: [type]:[eth_tag]:[mac_len]:[mac]:[ip_len]:[ip]
+            set $_evpn_p = (struct prefix_evpn *)$_p
+            set $_eth_tag = $_evpn_p->prefix.macip_addr.eth_tag
+            set $_mac_bytes = (unsigned char *)&$_evpn_p->prefix.macip_addr.mac
+            
+            printf "[%d]:[%u]:[%d]:%02x:%02x:%02x:%02x:%02x:%02x", $_evpn_route_type, $_eth_tag, 48, $_mac_bytes[0], $_mac_bytes[1], $_mac_bytes[2], $_mac_bytes[3], $_mac_bytes[4], $_mac_bytes[5]
+            
+            set $_ip_type = $_evpn_p->prefix.macip_addr.ip.ipa_type
+            if ($_ip_type == 2)
+              # IPv4 (AF_INET = 2)
+              printf ":[32]:"
+              dump_s_addr &$_evpn_p->prefix.macip_addr.ip.ipaddr_v4
+            else
+              if ($_ip_type == 10)
+                # IPv6 (AF_INET6 = 10)
+                printf ":[128]:"
+                dump_s6_addr &$_evpn_p->prefix.macip_addr.ip.ipaddr_v6
+              end
+            end
+          else
+            if ($_evpn_route_type == 3)
+              # Type 3: IMET route - format: [type]:[eth_tag]:[ip_len]:[ip]
+              set $_evpn_p = (struct prefix_evpn *)$_p
+              set $_eth_tag = $_evpn_p->prefix.imet_addr.eth_tag
+              set $_ip_type = $_evpn_p->prefix.imet_addr.ip.ipa_type
+              
+              if ($_ip_type == 2)
+                # IPv4 (AF_INET = 2)
+                printf "[%d]:[%u]:[32]:", $_evpn_route_type, $_eth_tag
+                dump_s_addr &$_evpn_p->prefix.imet_addr.ip.ipaddr_v4
+              else
+                if ($_ip_type == 10)
+                  # IPv6 (AF_INET6 = 10)
+                  printf "[%d]:[%u]:[128]:", $_evpn_route_type, $_eth_tag
+                  dump_s6_addr &$_evpn_p->prefix.imet_addr.ip.ipaddr_v6
+                else
+                  printf "[%d]:[%u]:[?]", $_evpn_route_type, $_eth_tag
+                end
+              end
+            else
+              if ($_evpn_route_type == 5)
+                # Type 5: IP Prefix route - format: [type]:[eth_tag]:[prefix_len]:[ip]
+                set $_evpn_p = (struct prefix_evpn *)$_p
+                set $_eth_tag = $_evpn_p->prefix.prefix_addr.eth_tag
+                set $_prefix_len = $_evpn_p->prefix.prefix_addr.ip_prefix_length
+                set $_ip_type = $_evpn_p->prefix.prefix_addr.ip.ipa_type
+                
+                printf "[%d]:[%u]:[%d]:", $_evpn_route_type, $_eth_tag, $_prefix_len
+                
+                if ($_ip_type == 2)
+                  # IPv4 (AF_INET = 2)
+                  dump_s_addr &$_evpn_p->prefix.prefix_addr.ip.ipaddr_v4
+                else
+                  if ($_ip_type == 10)
+                    # IPv6 (AF_INET6 = 10)
+                    dump_s6_addr &$_evpn_p->prefix.prefix_addr.ip.ipaddr_v6
+                  else
+                    printf "Unknown-IP-Type-%d", $_ip_type
+                  end
+                end
+              else
+                # Other types
+                printf "[%d]:[Type-%d]", $_evpn_route_type, $_evpn_route_type
+              end
+            end
+          end
+          printf "\n"
+        else
+          dump_prefix $_p
+        end
+        
+        if ($_indent_level == 0)
+          printf "  dest->flags: 0x%x", $_dest->flags
+        else
+          printf "    dest->flags: 0x%x", $_dest->flags
+        end
+        if ($_dest->flags & (1 << 0))
+          printf " PROCESS_SCHEDULED"
+        end
+        if ($_dest->flags & (1 << 1))
+          printf " USER_CLEAR"
+        end
+        if ($_dest->flags & (1 << 3))
+          printf " SELECTED"
+        end
+        printf "\n"
+        
+        # Walk through all path_info structures for this destination
+        set $_pi_num = 0
+        while ($_pi != 0)
+          set $_pi_num = $_pi_num + 1
+          set $_path_count = $_path_count + 1
+          
+          if ($_indent_level == 0)
+            printf "  --- Path #%d ---\n", $_pi_num
+            dump_bgp_path_info $_pi "  "
+          else
+            printf "    --- Path #%d ---\n", $_pi_num
+            dump_bgp_path_info $_pi "    "
+          end
+          
+          set $_pi = $_pi->next
+        end
+      end
+      end
+    end
+    
+    # Move to next route node - simple left-right-up traversal
+    set $_next = 0
+    
+    # Try going left first
+    if ($_rn != 0)
+      set $_left = ((struct route_node *)$_rn)->link[0]
+      if ($_left != 0)
+        set $_next = $_left
+      end
+    end
+    
+    # If no left, try right
+    if ($_next == 0 && $_rn != 0)
+      set $_right = ((struct route_node *)$_rn)->link[1]
+      if ($_right != 0)
+        set $_next = $_right
+      end
+    end
+    
+    # If no left or right, go up until we find an unvisited right branch
+    if ($_next == 0 && $_rn != 0)
+      set $_current = $_rn
+      set $_parent = ((struct route_node *)$_current)->parent
+      
+      while ($_parent != 0 && $_next == 0)
+        # Check if we came from the left child
+        set $_parent_left = ((struct route_node *)$_parent)->link[0]
+        if ($_parent_left == $_current)
+          # Try the right child
+          set $_parent_right = ((struct route_node *)$_parent)->link[1]
+          if ($_parent_right != 0)
+            set $_next = $_parent_right
+          end
+        end
+        
+        # Move up
+        if ($_next == 0)
+          set $_current = $_parent
+          if ($_parent != 0)
+            set $_parent = ((struct route_node *)$_current)->parent
+          end
+        end
+      end
+    end
+    
+    set $_rn = $_next
+  end
+end
+document walk_bgp_table_subtree
+Internal helper for walk_bgp_table - walks a route_table recursively.
+end
+
+define walk_bgp_table
+  set $_table = (struct bgp_table *)$arg0
+  set $_verbose = 0
+  if ($argc > 1)
+    set $_verbose = $arg1
+  end
+  
+  if ($_table == 0)
+    printf "Error: NULL table pointer\n"
+  else
+    printf "Walking BGP table at 0x%lx\n", $_table
+    printf "  AFI: %d, SAFI: %d\n", $_table->afi, $_table->safi
+    printf "  Version: %lu\n", $_table->version
+    
+    set $_dest_count = 0
+    set $_path_count = 0
+    
+    # Check if this is a two-level table (EVPN=5, MPLS_VPN=128, ENCAP=7)
+    set $_is_two_level = 0
+    if ($_table->safi == 5 || $_table->safi == 128 || $_table->safi == 7)
+      set $_is_two_level = 1
+      printf "  (Two-level table: RD -> Routes)\n"
+    end
+    
+    walk_bgp_table_subtree $_table 0 $_is_two_level
+    
+    printf "\n=== Summary ===\n"
+    printf "Total destinations with paths: %d\n", $_dest_count
+    printf "Total paths: %d\n", $_path_count
+  end
+end
+document walk_bgp_table
+Walk through a BGP table and dump all bgp_path_info structures with their state.
+
+This macro iterates through all route nodes in a BGP table, and for each
+destination that has path information, it dumps all the bgp_path_info 
+structures in the linked list along with their key state information including:
+- Peer information
+- Route type and sub-type
+- Flags (SELECTED, VALID, MULTIPATH, etc.)
+- Attributes (nexthop, etc.)
+- Extra information (EVPN, labels, vrfleak)
+
+Arguments:
+  (struct bgp_table *) pointer to the BGP table to walk
+
+Example usage:
+  (gdb) p bgp->rib[0][0]
+  (gdb) walk_bgp_table bgp->rib[0][0]
+end
