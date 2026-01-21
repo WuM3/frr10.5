@@ -54,6 +54,8 @@ bgpd_libbgp_a_SOURCES = \
 	bgpd/bgp_linkstate.c \
 	bgpd/bgp_linkstate_tlv.c \
 	bgpd/bgp_linkstate_vty.c \
+	bgpd/bgp_linkstate_poll.c \
+	bgpd/bgp_ls_tvr.c \
 	bgpd/bgp_mac.c \
 	bgpd/bgp_memory.c \
 	bgpd/bgp_mpath.c \
@@ -143,6 +145,8 @@ noinst_HEADERS += \
 	bgpd/bgp_linkstate.h \
 	bgpd/bgp_linkstate_tlv.h \
 	bgpd/bgp_linkstate_vty.h \
+	bgpd/bgp_linkstate_poll.h \
+	bgpd/bgp_ls_tvr.h \
 	bgpd/bgp_mac.h \
 	bgpd/bgp_memory.h \
 	bgpd/bgp_mpath.h \

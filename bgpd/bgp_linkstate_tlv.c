@@ -694,7 +694,7 @@ static int bgp_ls_spf_handle_nlri(struct peer *peer, struct attr *attr,
     if (bgp_ls_spf_should_run(ctx))
         bgp_ls_spf_run(ctx);
 
-	if (withdraw)
+    if (withdraw)
 		bgp_withdraw(peer, p, 0, afi, safi, ZEBRA_ROUTE_BGP,
 			     BGP_ROUTE_NORMAL, NULL, NULL, 0);
 	else

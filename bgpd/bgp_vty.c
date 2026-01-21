@@ -583,6 +583,8 @@ safi_t bgp_vty_safi_from_str(const char *safi_str)
 		safi = SAFI_FLOWSPEC;
 	else if (strmatch(safi_str, "link-state"))
 		safi = SAFI_LINKSTATE;
+	else if (strmatch(safi_str, "linkstate"))
+		safi = SAFI_LINKSTATE;
 	else if (strmatch(safi_str, "link-state-vpn"))
 		safi = SAFI_LINKSTATE_VPN;
 	return safi;
@@ -11412,10 +11414,10 @@ DEFPY (af_routetarget_import,
 
 DEFUN_NOSH (address_family_ipv4_safi,
 	address_family_ipv4_safi_cmd,
-	"address-family ipv4 [<unicast|multicast|vpn|labeled-unicast|flowspec>]",
+	"address-family ipv4 [<unicast|multicast|vpn|labeled-unicast|flowspec|linkstate>]",
 	"Enter Address Family command mode\n"
 	BGP_AF_STR
-	BGP_SAFI_WITH_LABEL_HELP_STR)
+	BGP_SAFI_WITH_LABEL_LS_HELP_STR)
 {
 
 	if (argc == 3) {

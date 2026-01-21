@@ -1,0 +1,73 @@
+========================================
+BGP-LS 单对单测试报告
+========================================
+
+测试时间: 2026年 01月 20日 星期二 13:49:39 CST
+
+网络拓扑:
+  Router1 (10.0.0.1) ← veth → Router2 (10.0.0.2)
+  Router1 测试接口: eth0 (192.168.1.1/24)
+
+测试结果:
+-----------------------------------------
+
+1. BGP会话状态: Unknown
+
+2. Link-State轮询状态: unknown
+
+3. vtysh可用性: no
+
+4. 抓包统计:
+   总数据包: 0
+   UPDATE消息: 
+
+5. 日志摘要:
+Router1 (最后30行):
+2026/01/20 13:48:56 BGP: [K9G3A-CJ5QQ] u1:s1 announcing routes upon coalesce timer expiry(1050 ms)
+2026/01/20 13:48:56 debugging: BGP: [K9G3A-CJ5QQ] u1:s1 announcing routes upon coalesce timer expiry(1050 ms)
+2026/01/20 13:48:56 BGP: [GB3VH-EAZK8] 10.0.0.2 [FSM] Timer (routeadv timer expire for Outgoing)
+2026/01/20 13:48:56 debugging: BGP: [GB3VH-EAZK8] 10.0.0.2 [FSM] Timer (routeadv timer expire for Outgoing)
+2026/01/20 13:48:56 BGP: [ZP3RE-J4Q8C] send End-of-RIB for Link State to 10.0.0.2
+2026/01/20 13:48:56 debugging: BGP: [ZP3RE-J4Q8C] send End-of-RIB for Link State to 10.0.0.2
+2026/01/20 13:48:56 BGP: [M59KS-A3ZXZ] bgp_update_receive_eor: rcvd End-of-RIB for Link State from 10.0.0.2 in vrf default
+2026/01/20 13:48:56 informational: BGP: [M59KS-A3ZXZ] bgp_update_receive_eor: rcvd End-of-RIB for Link State from 10.0.0.2 in vrf default
+2026/01/20 13:49:24 BGP: [YPZ8F-GWE9H] bgp_linkstate_poll_timer: Polling link-state information
+2026/01/20 13:49:24 BGP: [JT1H6-JDXZ3] bgp_linkstate_poll_timer: Initialized linkstate cache
+2026/01/20 13:49:24 BGP: [TYH3G-Y6BRB] read_interface_linkstate: Read link-state for eth0 (index=2, status=UP, bw=0 bps)
+2026/01/20 13:49:24 BGP: [RP3MT-3PZQ0] bgp_linkstate_poll_timer: New interface detected: eth0, calling linkstate_add()
+2026/01/20 13:49:24 BGP: [HK696-0G90E] linkstate_add: Adding link-state for eth0 (status=1, bw=0, metric=10)
+2026/01/20 13:49:24 BGP: [MWKN3-W59K9] encode_link_attributes: Encoded 13 bytes of Link Attribute TLVs for eth0 (SAFI=BGP-LS)
+2026/01/20 13:49:24 BGP: [KWMDG-HG9QH] bgp_linkstate_if_map_init: Initialized linkstate interface map
+2026/01/20 13:49:24 BGP: [WCBWX-Y252N] linkstate_add: Added eth0 to interface map (hash table)
+2026/01/20 13:49:24 BGP: [TXTN3-QQWT0] linkstate_add: Successfully added link-state for eth0
+2026/01/20 13:49:24 BGP: [RPD98-3WABF] bgp_linkstate_poll_timer: Added new interface eth0 to cache and RIB
+2026/01/20 13:49:24 debugging: BGP: [YPZ8F-GWE9H] bgp_linkstate_poll_timer: Polling link-state information
+2026/01/20 13:49:24 informational: BGP: [JT1H6-JDXZ3] bgp_linkstate_poll_timer: Initialized linkstate cache
+2026/01/20 13:49:24 informational: BGP: [TYH3G-Y6BRB] read_interface_linkstate: Read link-state for eth0 (index=2, status=UP, bw=0 bps)
+2026/01/20 13:49:24 informational: BGP: [RP3MT-3PZQ0] bgp_linkstate_poll_timer: New interface detected: eth0, calling linkstate_add()
+2026/01/20 13:49:24 informational: BGP: [HK696-0G90E] linkstate_add: Adding link-state for eth0 (status=1, bw=0, metric=10)
+2026/01/20 13:49:24 debugging: BGP: [MWKN3-W59K9] encode_link_attributes: Encoded 13 bytes of Link Attribute TLVs for eth0 (SAFI=BGP-LS)
+2026/01/20 13:49:24 informational: BGP: [KWMDG-HG9QH] bgp_linkstate_if_map_init: Initialized linkstate interface map
+2026/01/20 13:49:24 debugging: BGP: [WCBWX-Y252N] linkstate_add: Added eth0 to interface map (hash table)
+2026/01/20 13:49:24 informational: BGP: [TXTN3-QQWT0] linkstate_add: Successfully added link-state for eth0
+2026/01/20 13:49:24 informational: BGP: [RPD98-3WABF] bgp_linkstate_poll_timer: Added new interface eth0 to cache and RIB
+2026/01/20 13:49:24 BGP: [Z38CW-7NYWG] group_announce_route_walkcb: afi=link-state, safi=link-state, p=Unknown Unknown ID:0x0 {}/0(0x56b5bdd78110)
+2026/01/20 13:49:24 debugging: BGP: [Z38CW-7NYWG] group_announce_route_walkcb: afi=link-state, safi=link-state, p=Unknown Unknown ID:0x0 {}/0(0x56b5bdd78110)
+
+Router2 (最后30行):
+2026/01/20 13:48:54 BGP: [ZD14A-W8VMJ] BGP Linkstate Poll: Initializing VTY commands
+2026/01/20 13:48:54 BGP: [T6RHV-FFJ7F] BGP Linkstate Poll: VTY commands installed successfully
+2026/01/20 13:48:54 BGP: [T83RR-8SM5G] bgpd 10.6-dev starting: vty@2605, bgp@<all>:179
+2026/01/20 13:48:54 BGP: [YAF85-253AP][EC 100663299] buffer_flush_available: write error on fd 2: Bad file descriptor
+2026/01/20 13:48:54 errors: BGP: [YAF85-253AP][EC 100663299] buffer_flush_available: write error on fd 2: Bad file descriptor
+2026/01/20 13:48:54 BGP: [THHDB-YPEY6][EC 100663299] vtysh_flush: write error to fd -1, closing
+2026/01/20 13:48:54 errors: BGP: [THHDB-YPEY6][EC 100663299] vtysh_flush: write error to fd -1, closing
+2026/01/20 13:48:56 BGP: [M59KS-A3ZXZ] bgp_update_receive_eor: rcvd End-of-RIB for Link State from 10.0.0.1 in vrf default
+2026/01/20 13:48:56 informational: BGP: [M59KS-A3ZXZ] bgp_update_receive_eor: rcvd End-of-RIB for Link State from 10.0.0.1 in vrf default
+2026/01/20 13:48:56 BGP: [K9G3A-CJ5QQ] u1:s1 announcing routes upon coalesce timer expiry(1100 ms)
+2026/01/20 13:48:56 debugging: BGP: [K9G3A-CJ5QQ] u1:s1 announcing routes upon coalesce timer expiry(1100 ms)
+
+========================================
+抓包文件: /tmp/bgpls_test.pcap
+完整日志: /tmp/frr_router1.log, /tmp/frr_router2.log
+========================================

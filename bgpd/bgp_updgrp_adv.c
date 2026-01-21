@@ -228,6 +228,13 @@ static int group_announce_route_walkcb(struct update_group *updgrp, void *arg)
 	peer = UPDGRP_PEER(updgrp);
 	addpath_capable = bgp_addpath_encode_tx(peer, afi, safi);
 
+	/* BGP-LS调试 */
+	if (afi == AFI_LINKSTATE) {
+		printf("[BGP-LS-INFO] group_announce_route_walkcb: peer=%s, afi=%d, safi=%d\n", 
+		       peer->host, afi, safi);
+		fflush(stdout);
+	}
+
 	if (BGP_DEBUG(update, UPDATE_OUT))
 		zlog_debug("%s: afi=%s, safi=%s, p=%pBD", __func__,
 			   afi2str(afi), safi2str(safi), ctx->dest);
@@ -276,11 +283,19 @@ static int group_announce_route_walkcb(struct update_group *updgrp, void *arg)
 			}
 
 			if (ctx->pi) {
+				if (afi == AFI_LINKSTATE) {
+					printf("[BGP-LS-INFO] Calling subgroup_process_announce_selected with pi=%p\n", ctx->pi);
+					fflush(stdout);
+				}
 				subgroup_process_announce_selected(
 					subgrp, ctx->pi, ctx->dest, afi, safi,
 					bgp_addpath_id_for_peer(peer, afi, safi,
 								&ctx->pi->tx_addpath));
 			} else {
+				if (afi == AFI_LINKSTATE) {
+					printf("[BGP-LS-INFO] ctx->pi is NULL, using adj_out\n");
+					fflush(stdout);
+				}
 				RB_FOREACH_SAFE (adj, bgp_adj_out_rb, &ctx->dest->adj_out,
 						 adj_next) {
 					if (adj->subgroup == subgrp) {
@@ -1131,13 +1146,34 @@ void group_announce_route(struct bgp *bgp, afi_t afi, safi_t safi,
 	ctx.pi = pi;	// 要通告的路径信息
 	ctx.dest = dest;	// 目的前缀节点
 
+	/* BGP-LS调试 */
+	if (afi == AFI_LINKSTATE) {
+		printf("[BGP-LS-INFO] group_announce_route called: AFI=%d, SAFI=%d\n", afi, safi);
+		fflush(stdout);
+	}
+
 	/* If suppress fib is enabled, the route will be advertised when
 	 * FIB status is received
 	 */
-	if (!bgp_check_advertise(bgp, dest, safi))
+	if (!bgp_check_advertise(bgp, dest, safi)) {
+		if (afi == AFI_LINKSTATE) {
+			printf("[BGP-LS-INFO] bgp_check_advertise returned false, skipping announce\n");
+			fflush(stdout);
+		}
 		return;
+	}
+
+	if (afi == AFI_LINKSTATE) {
+		printf("[BGP-LS-INFO] Calling update_group_af_walk\n");
+		fflush(stdout);
+	}
 
 	update_group_af_walk(bgp, afi, safi, group_announce_route_walkcb, &ctx);
+	
+	if (afi == AFI_LINKSTATE) {
+		printf("[BGP-LS-INFO] update_group_af_walk completed\n");
+		fflush(stdout);
+	}
 }
 
 void update_group_show_adj_queue(struct bgp *bgp, afi_t afi, safi_t safi,
