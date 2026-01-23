@@ -4091,6 +4091,10 @@ static void bgp_process_main_one(struct bgp *bgp, struct bgp_dest *dest,
 	}
 	//*****// */
 	// 这是最常见的调用路径：最佳路径发生了变化，需要向对等体通告//
+	if (afi == AFI_LINKSTATE) {
+		printf("[BGP-LS-INFO] bgp_process: calling group_announce_route with new_select=%p\n", new_select);
+		fflush(stdout);
+	}
 	group_announce_route(bgp, afi, safi, dest, new_select);
 
 	/* unicast routes must also be annouced to labeled-unicast update-groups
@@ -7588,6 +7592,11 @@ void bgp_cleanup_routes(struct bgp *bgp)
 
 			assert(dest);
 		}
+	}
+
+	/* Cleanup BGP-LS dedicated table */
+	if (bgp->ls_table) {
+		bgp_cleanup_table(bgp, bgp->ls_table, AFI_LINKSTATE, SAFI_LINKSTATE);
 	}
 }
 

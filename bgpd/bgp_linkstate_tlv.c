@@ -694,7 +694,7 @@ static int bgp_ls_spf_handle_nlri(struct peer *peer, struct attr *attr,
     if (bgp_ls_spf_should_run(ctx))
         bgp_ls_spf_run(ctx);
 
-	if (withdraw)
+    if (withdraw)
 		bgp_withdraw(peer, p, 0, afi, safi, ZEBRA_ROUTE_BGP,
 			     BGP_ROUTE_NORMAL, NULL, NULL, 0);
 	else
@@ -757,10 +757,11 @@ void bgp_nlri_encode_linkstate(struct stream *s, const struct prefix *p)
 	/* NLRI type */
 	stream_putw(s, p->u.prefix_linkstate.nlri_type);
 
-	/* Size */
-	stream_putw(s, p->prefixlen);
+	/* Size (in bytes, not bits!) */
+	uint16_t nlri_length_bytes = p->prefixlen / 8;
+	stream_putw(s, nlri_length_bytes);
 
-	stream_put(s, (const void *)p->u.prefix_linkstate.ptr, p->prefixlen);
+	stream_put(s, (const void *)p->u.prefix_linkstate.ptr, nlri_length_bytes);
 }
 
 static size_t bgp_linkstate_nlri_hexa_display(char *buf, size_t size,

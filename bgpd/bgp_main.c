@@ -51,6 +51,8 @@
 #include "bgpd/bgp_nhg.h"
 #include "bgpd/bgp_routemap_nb.h"
 #include "bgpd/bgp_community_alias.h"
+#include "bgpd/bgp_linkstate.h"
+#include "bgpd/bgp_linkstate_poll.h"
 
 DEFINE_HOOK(bgp_hook_config_write_vrf, (struct vty *vty, struct vrf *vrf),
 	    (vty, vrf));
@@ -527,6 +529,12 @@ int main(int argc, char **argv)
 
 	/* BGP related initialization.  */
 	bgp_init((unsigned short)instance);
+
+	/* Initialize BGP linkstate base (display hooks) */
+	bgp_linkstate_init();
+	
+	/* Initialize BGP linkstate polling (VTY commands) */
+	bgp_linkstate_poll_init();
 
 	if (list_isempty(bm->addresses)) {
 		snprintf(bgpd_di.startinfo, sizeof(bgpd_di.startinfo),

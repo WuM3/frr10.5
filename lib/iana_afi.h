@@ -41,6 +41,7 @@ typedef enum {
 	IANA_SAFI_MPLS_VPN = 128,
 	IANA_SAFI_FLOWSPEC = 133,
 	IANA_SAFI_BGPLS_SPF = 80,
+	IANA_SAFI_BGPLS_TVR = 81,
 } iana_safi_t;
 
 static inline afi_t afi_iana2int(iana_afi_t afi)
@@ -108,6 +109,8 @@ static inline safi_t safi_iana2int(iana_safi_t safi)
 		return SAFI_LINKSTATE_VPN;
 	case IANA_SAFI_BGPLS_SPF:
 		return SAFI_BGPLS_SPF;
+	case IANA_SAFI_BGPLS_TVR:
+		return SAFI_BGPLS_TVR;
 	case IANA_SAFI_RESERVED:
 		return SAFI_MAX;
 	}
@@ -138,7 +141,8 @@ static inline iana_safi_t safi_int2iana(safi_t safi)
 		return IANA_SAFI_LINKSTATE_VPN;
 	case SAFI_BGPLS_SPF:
 		return IANA_SAFI_BGPLS_SPF;
-	case SAFI_UNSPEC:
+	case SAFI_BGPLS_TVR:
+		return IANA_SAFI_BGPLS_TVR;	
 	case SAFI_MAX:
 		return IANA_SAFI_RESERVED;
 	}

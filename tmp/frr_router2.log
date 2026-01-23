@@ -1,0 +1,15 @@
+2026/01/20 13:48:54 BGP: [ZD14A-W8VMJ] BGP Linkstate Poll: Initializing VTY commands
+2026/01/20 13:48:54 BGP: [T6RHV-FFJ7F] BGP Linkstate Poll: VTY commands installed successfully
+2026/01/20 13:48:54 BGP: [T83RR-8SM5G] bgpd 10.6-dev starting: vty@2605, bgp@<all>:179
+2026/01/20 13:48:54 BGP: [YAF85-253AP][EC 100663299] buffer_flush_available: write error on fd 2: Bad file descriptor
+2026/01/20 13:48:54 errors: BGP: [YAF85-253AP][EC 100663299] buffer_flush_available: write error on fd 2: Bad file descriptor
+2026/01/20 13:48:54 BGP: [THHDB-YPEY6][EC 100663299] vtysh_flush: write error to fd -1, closing
+2026/01/20 13:48:54 errors: BGP: [THHDB-YPEY6][EC 100663299] vtysh_flush: write error to fd -1, closing
+2026/01/20 13:48:56 BGP: [M59KS-A3ZXZ] bgp_update_receive_eor: rcvd End-of-RIB for Link State from 10.0.0.1 in vrf default
+2026/01/20 13:48:56 informational: BGP: [M59KS-A3ZXZ] bgp_update_receive_eor: rcvd End-of-RIB for Link State from 10.0.0.1 in vrf default
+2026/01/20 13:48:56 BGP: [K9G3A-CJ5QQ] u1:s1 announcing routes upon coalesce timer expiry(1100 ms)
+2026/01/20 13:48:56 debugging: BGP: [K9G3A-CJ5QQ] u1:s1 announcing routes upon coalesce timer expiry(1100 ms)
+2026/01/20 13:49:39 BGP: [ZW1GY-R46JE] Terminating on signal
+2026/01/20 13:49:39 notifications: BGP: [ZW1GY-R46JE] Terminating on signal
+2026/01/20 13:49:39 BGP: [Q7K83-34XFB][EC 33554501] sendmsg_nexthop: zclient_send_message() failed
+2026/01/20 13:49:39 warnings: BGP: [Q7K83-34XFB][EC 33554501] sendmsg_nexthop: zclient_send_message() failed

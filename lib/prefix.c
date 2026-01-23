@@ -254,11 +254,12 @@ int prefix_match(union prefixconstptr unet, union prefixconstptr upfx)
 		    p->u.prefix_linkstate.nlri_type)
 			return 0;
 
-		/* Set both prefix's head pointer. */
-		np = (const uint8_t *)&n->u.prefix_linkstate.ptr;
-		pp = (const uint8_t *)&p->u.prefix_linkstate.ptr;
+		/* Set both prefix's head pointer - 修复：应该解引用ptr指针，而不是取ptr字段的地址 */
+		np = (const uint8_t *)n->u.prefix_linkstate.ptr;  // 移除 &
+		pp = (const uint8_t *)p->u.prefix_linkstate.ptr;  // 移除 &
 
-		offset = n->prefixlen; /* length is checked above */
+		/* prefixlen is in bits, convert to bytes for comparison */
+		offset = n->prefixlen / 8; /* length is checked above */
 
 		while (offset--)
 			if (np[offset] != pp[offset])
@@ -396,7 +397,7 @@ void prefix_copy(union prefixptr udest, union prefixconstptr usrc)
 		memcpy((void *)dest->u.prefix_flowspec.ptr,
 		       (void *)src->u.prefix_flowspec.ptr, len);
 	} else if (src->family == AF_LINKSTATE) {
-		len = src->prefixlen;
+		len = src->prefixlen / 8;  /* prefixlen is in bits, convert to bytes */
 		dest->u.prefix_linkstate.nlri_type =
 			src->u.prefix_linkstate.nlri_type;
 		temp = XCALLOC(MTYPE_PREFIX_LINKSTATE, len);
@@ -558,7 +559,8 @@ int prefix_cmp(union prefixconstptr up1, union prefixconstptr up2)
 		if (p1->prefixlen != p2->prefixlen)
 			return numcmp(p1->prefixlen, p2->prefixlen);
 
-		offset = p1->prefixlen;
+		/* prefixlen is in bits, convert to bytes for comparison */
+		offset = p1->prefixlen / 8;
 		while (offset--)
 			if (pp1[offset] != pp2[offset])
 				return numcmp(pp1[offset], pp2[offset]);
