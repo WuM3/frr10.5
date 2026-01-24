@@ -179,7 +179,7 @@ struct flowspec_prefix {
 
 struct linkstate_prefix {
 	uint16_t nlri_type;
-	uintptr_t ptr;
+	void *ls_data;  /* Pointer to semantic data (struct linkstate_info *) */
 };
 
 /* FRR generic prefix structure. */

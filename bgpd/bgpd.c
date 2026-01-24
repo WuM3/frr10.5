@@ -74,6 +74,7 @@
 #include "bgpd/bgp_flowspec.h"
 #include "bgpd/bgp_linkstate.h"
 #include "bgpd/bgp_linkstate_vty.h"
+#include "bgpd/bgp_linkstate_poll.h"
 #include "bgpd/bgp_labelpool.h"
 #include "bgpd/bgp_pbr.h"
 #include "bgpd/bgp_addpath.h"
@@ -4559,6 +4560,13 @@ void bgp_free(struct bgp *bgp)
 
 	bgp_evpn_cleanup(bgp);
 	bgp_pbr_cleanup(bgp);
+
+	/* Cleanup BGP-LS resources (polling, cache, interface list) */
+	bgp_linkstate_cleanup(bgp);
+
+	/* Cleanup BGP-LS dedicated table */
+	if (bgp->ls_table)
+		bgp_table_finish(&bgp->ls_table);
 
 	for (afi = AFI_IP; afi < AFI_MAX; afi++) {
 		enum vpn_policy_direction dir;

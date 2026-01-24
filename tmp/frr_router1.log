@@ -1,0 +1,295 @@
+2026/01/20 13:48:54 BGP: [ZD14A-W8VMJ] BGP Linkstate Poll: Initializing VTY commands
+2026/01/20 13:48:54 BGP: [T6RHV-FFJ7F] BGP Linkstate Poll: VTY commands installed successfully
+2026/01/20 13:48:54 BGP: [T83RR-8SM5G] bgpd 10.6-dev starting: vty@2605, bgp@<all>:179
+2026/01/20 13:48:54 BGP: [XSTTY-32VB4] bgp_linkstate_poll_start: Starting link-state polling (interval=30 sec)
+2026/01/20 13:48:54 BGP: [YQETG-BVTAF] bgp_linkstate_set_poll_interval: Set link-state poll interval to 30 sec
+2026/01/20 13:48:54 BGP: [XSTTY-32VB4] bgp_linkstate_poll_start: Starting link-state polling (interval=30 sec)
+2026/01/20 13:48:54 BGP: [YAF85-253AP][EC 100663299] buffer_flush_available: write error on fd 2: Bad file descriptor
+2026/01/20 13:48:54 informational: BGP: [XSTTY-32VB4] bgp_linkstate_poll_start: Starting link-state polling (interval=30 sec)
+2026/01/20 13:48:54 informational: BGP: [YQETG-BVTAF] bgp_linkstate_set_poll_interval: Set link-state poll interval to 30 sec
+2026/01/20 13:48:54 informational: BGP: [XSTTY-32VB4] bgp_linkstate_poll_start: Starting link-state polling (interval=30 sec)
+2026/01/20 13:48:54 errors: BGP: [YAF85-253AP][EC 100663299] buffer_flush_available: write error on fd 2: Bad file descriptor
+2026/01/20 13:48:54 BGP: [THHDB-YPEY6][EC 100663299] vtysh_flush: write error to fd -1, closing
+2026/01/20 13:48:54 errors: BGP: [THHDB-YPEY6][EC 100663299] vtysh_flush: write error to fd -1, closing
+2026/01/20 13:48:54 BGP: [SHWNK-NWT5S][EC 100663304] Command returned Incomplete on config line 11: debug bgp bestpath
+2026/01/20 13:48:54 errors: BGP: [SHWNK-NWT5S][EC 100663304] Command returned Incomplete on config line 11: debug bgp bestpath
+2026/01/20 13:48:55 BGP: [SEJV2-PXFYK] 10.0.0.2 [FSM] Timer (start timer expire for Outgoing).
+2026/01/20 13:48:55 BGP: [YMS6M-YHVP0] 10.0.0.2 [FSM] BGP_Start (Idle->Connect), fd -1 for Outgoing
+2026/01/20 13:48:55 BGP: [PWEGS-X499E] 10.0.0.2 [FSM] Waiting for NHT, no path to neighbor present for Outgoing
+2026/01/20 13:48:55 BGP: [Y3C15-ECQV0] bgp_fsm_change_status : vrf default(0), Status: Connect established_peers 0 for Outgoing
+2026/01/20 13:48:55 BGP: [ZZPVC-3AHMF] 10.0.0.2 fd -1 went from Idle to Connect for Outgoing
+2026/01/20 13:48:55 debugging: BGP: [SEJV2-PXFYK] 10.0.0.2 [FSM] Timer (start timer expire for Outgoing).
+2026/01/20 13:48:55 debugging: BGP: [YMS6M-YHVP0] 10.0.0.2 [FSM] BGP_Start (Idle->Connect), fd -1 for Outgoing
+2026/01/20 13:48:55 debugging: BGP: [PWEGS-X499E] 10.0.0.2 [FSM] Waiting for NHT, no path to neighbor present for Outgoing
+2026/01/20 13:48:55 debugging: BGP: [Y3C15-ECQV0] bgp_fsm_change_status : vrf default(0), Status: Connect established_peers 0 for Outgoing
+2026/01/20 13:48:55 debugging: BGP: [ZZPVC-3AHMF] 10.0.0.2 fd -1 went from Idle to Connect for Outgoing
+2026/01/20 13:48:55 BGP: [YMS6M-YHVP0] 10.0.0.2 [FSM] TCP_connection_open_failed (Connect->Active), fd -1 for Outgoing
+2026/01/20 13:48:55 BGP: [Y3C15-ECQV0] bgp_fsm_change_status : vrf default(0), Status: Active established_peers 0 for Outgoing
+2026/01/20 13:48:55 BGP: [ZZPVC-3AHMF] 10.0.0.2 fd -1 went from Connect to Active for Outgoing
+2026/01/20 13:48:55 debugging: BGP: [YMS6M-YHVP0] 10.0.0.2 [FSM] TCP_connection_open_failed (Connect->Active), fd -1 for Outgoing
+2026/01/20 13:48:55 debugging: BGP: [Y3C15-ECQV0] bgp_fsm_change_status : vrf default(0), Status: Active established_peers 0 for Outgoing
+2026/01/20 13:48:55 debugging: BGP: [ZZPVC-3AHMF] 10.0.0.2 fd -1 went from Connect to Active for Outgoing
+2026/01/20 13:48:55 BGP: [YMS6M-YHVP0] 10.0.0.2 [FSM] ConnectRetry_timer_expired (Active->Connect), fd -1 for Outgoing
+2026/01/20 13:48:55 BGP: [Z195V-FNKRK] 10.0.0.2 [Event] Connect start to 10.0.0.2 fd 25
+2026/01/20 13:48:55 BGP: [GNSWT-VK6XB] 10.0.0.2 [FSM] Non blocking connect waiting result, fd 25 for Outgoing
+2026/01/20 13:48:55 BGP: [Y3C15-ECQV0] bgp_fsm_change_status : vrf default(0), Status: Connect established_peers 0 for Outgoing
+2026/01/20 13:48:55 BGP: [ZZPVC-3AHMF] 10.0.0.2 fd 25 went from Active to Connect for Outgoing
+2026/01/20 13:48:55 debugging: BGP: [YMS6M-YHVP0] 10.0.0.2 [FSM] ConnectRetry_timer_expired (Active->Connect), fd -1 for Outgoing
+2026/01/20 13:48:55 debugging: BGP: [Z195V-FNKRK] 10.0.0.2 [Event] Connect start to 10.0.0.2 fd 25
+2026/01/20 13:48:55 debugging: BGP: [GNSWT-VK6XB] 10.0.0.2 [FSM] Non blocking connect waiting result, fd 25 for Outgoing
+2026/01/20 13:48:55 debugging: BGP: [Y3C15-ECQV0] bgp_fsm_change_status : vrf default(0), Status: Connect established_peers 0 for Outgoing
+2026/01/20 13:48:55 debugging: BGP: [ZZPVC-3AHMF] 10.0.0.2 fd 25 went from Active to Connect for Outgoing
+2026/01/20 13:48:55 BGP: [YMS6M-YHVP0] 10.0.0.2 [FSM] TCP_connection_open (Connect->OpenSent), fd 25 for Outgoing
+2026/01/20 13:48:55 BGP: [ZR8QK-NW86V] 10.0.0.2 open active, local address 10.0.0.1 for Outgoing
+2026/01/20 13:48:55 BGP: [XKJ09-9VTZ7] 10.0.0.2 Sending hostname cap with hn = router1, dn = (null)
+2026/01/20 13:48:55 BGP: [YJSKD-N5GGC] 10.0.0.2 Sending Software Version cap, value: FRRouting/10.6-dev
+2026/01/20 13:48:55 BGP: [G1CME-TC11B] 10.0.0.2(Unknown) fd 25 sending OPEN, version 4, my as 65001, holdtime 180, id 1.1.1.1
+2026/01/20 13:48:55 BGP: [Y3C15-ECQV0] bgp_fsm_change_status : vrf default(0), Status: OpenSent established_peers 0 for Outgoing
+2026/01/20 13:48:55 BGP: [ZZPVC-3AHMF] 10.0.0.2 fd 25 went from Connect to OpenSent for Outgoing
+2026/01/20 13:48:55 debugging: BGP: [YMS6M-YHVP0] 10.0.0.2 [FSM] TCP_connection_open (Connect->OpenSent), fd 25 for Outgoing
+2026/01/20 13:48:55 debugging: BGP: [ZR8QK-NW86V] 10.0.0.2 open active, local address 10.0.0.1 for Outgoing
+2026/01/20 13:48:55 debugging: BGP: [XKJ09-9VTZ7] 10.0.0.2 Sending hostname cap with hn = router1, dn = (null)
+2026/01/20 13:48:55 debugging: BGP: [YJSKD-N5GGC] 10.0.0.2 Sending Software Version cap, value: FRRouting/10.6-dev
+2026/01/20 13:48:55 debugging: BGP: [G1CME-TC11B] 10.0.0.2(Unknown) fd 25 sending OPEN, version 4, my as 65001, holdtime 180, id 1.1.1.1
+2026/01/20 13:48:55 debugging: BGP: [Y3C15-ECQV0] bgp_fsm_change_status : vrf default(0), Status: OpenSent established_peers 0 for Outgoing
+2026/01/20 13:48:55 debugging: BGP: [ZZPVC-3AHMF] 10.0.0.2 fd 25 went from Connect to OpenSent for Outgoing
+2026/01/20 13:48:55 BGP: [WNM1E-D314G] 10.0.0.2 rcv OPEN, version 4, remote-as (in open) 65001, holdtime 180, id 2.2.2.2
+2026/01/20 13:48:55 BGP: [QG29C-5TSVS] 10.0.0.2 rcv OPEN w/ OPTION parameter len: 97
+2026/01/20 13:48:55 BGP: [NVZPF-5ST3B] 10.0.0.2 rcvd OPEN w/ optional parameter type 2 (Capability) len 6
+2026/01/20 13:48:55 BGP: [SCW43-WN4M1] 10.0.0.2 OPEN has MultiProtocol Extensions capability (1), length 4
+2026/01/20 13:48:55 BGP: [VXVH9-3MXR0] 10.0.0.2 OPEN has MultiProtocol Extensions capability for afi/safi: link-state/link-state
+2026/01/20 13:48:55 BGP: [NVZPF-5ST3B] 10.0.0.2 rcvd OPEN w/ optional parameter type 2 (Capability) len 2
+2026/01/20 13:48:55 BGP: [SCW43-WN4M1] 10.0.0.2 OPEN has Route Refresh capability (2), length 0
+2026/01/20 13:48:55 BGP: [NVZPF-5ST3B] 10.0.0.2 rcvd OPEN w/ optional parameter type 2 (Capability) len 2
+2026/01/20 13:48:55 BGP: [SCW43-WN4M1] 10.0.0.2 OPEN has Enhanced Route Refresh capability (70), length 0
+2026/01/20 13:48:55 BGP: [NVZPF-5ST3B] 10.0.0.2 rcvd OPEN w/ optional parameter type 2 (Capability) len 6
+2026/01/20 13:48:55 BGP: [SCW43-WN4M1] 10.0.0.2 OPEN has 4-octet AS number capability (65), length 4
+2026/01/20 13:48:55 BGP: [NVZPF-5ST3B] 10.0.0.2 rcvd OPEN w/ optional parameter type 2 (Capability) len 2
+2026/01/20 13:48:55 BGP: [SCW43-WN4M1] 10.0.0.2 OPEN has BGP Extended Message capability (6), length 0
+2026/01/20 13:48:55 BGP: [NVZPF-5ST3B] 10.0.0.2 rcvd OPEN w/ optional parameter type 2 (Capability) len 6
+2026/01/20 13:48:55 BGP: [SCW43-WN4M1] 10.0.0.2 OPEN has AddPath capability (69), length 4
+2026/01/20 13:48:55 BGP: [SBSKM-G6QBW] 10.0.0.2 OPEN has AddPath capability for afi/safi: link-state/link-state, receive
+2026/01/20 13:48:55 BGP: [NVZPF-5ST3B] 10.0.0.2 rcvd OPEN w/ optional parameter type 2 (Capability) len 7
+2026/01/20 13:48:55 BGP: [SCW43-WN4M1] 10.0.0.2 OPEN has Paths-Limit capability (76), length 5
+2026/01/20 13:48:55 BGP: [MSJ7S-E9MRG] 10.0.0.2 OPEN has Paths-Limit capability for afi/safi: link-state/link-state limit: 0
+2026/01/20 13:48:55 BGP: [NVZPF-5ST3B] 10.0.0.2 rcvd OPEN w/ optional parameter type 2 (Capability) len 11
+2026/01/20 13:48:55 BGP: [SCW43-WN4M1] 10.0.0.2 OPEN has FQDN capability (73), length 9
+2026/01/20 13:48:55 BGP: [MR6EG-NS6N7] 10.0.0.2 received hostname router2, domainname (null)
+2026/01/20 13:48:55 BGP: [NVZPF-5ST3B] 10.0.0.2 rcvd OPEN w/ optional parameter type 2 (Capability) len 4
+2026/01/20 13:48:55 BGP: [SCW43-WN4M1] 10.0.0.2 OPEN has Graceful Restart capability (64), length 2
+2026/01/20 13:48:55 BGP: [V30NV-6FS3W] 10.0.0.2(router2) OPEN has GR capability, Restart time 120 R-bit SET N-bit SET
+2026/01/20 13:48:55 BGP: [NVZPF-5ST3B] 10.0.0.2 rcvd OPEN w/ optional parameter type 2 (Capability) len 9
+2026/01/20 13:48:55 BGP: [SCW43-WN4M1] 10.0.0.2 OPEN has Long-lived BGP Graceful Restart capability (71), length 7
+2026/01/20 13:48:55 BGP: [ZVHDJ-HW40B] 10.0.0.2 Addr-family link-state/link-state(afi/safi) not enabled. Ignore the Long-lived Graceful Restart capability
+2026/01/20 13:48:55 BGP: [NVZPF-5ST3B] 10.0.0.2 rcvd OPEN w/ optional parameter type 2 (Capability) len 20
+2026/01/20 13:48:55 BGP: [SCW43-WN4M1] 10.0.0.2 OPEN has Software Version capability (75), length 18
+2026/01/20 13:48:55 BGP: [N5H8N-2BZ13] 10.0.0.2 received Software Version: FRRouting/10.6-dev
+2026/01/20 13:48:55 BGP: [YMS6M-YHVP0] 10.0.0.2 [FSM] Receive_OPEN_message (OpenSent->OpenConfirm), fd 25 for Outgoing
+2026/01/20 13:48:55 BGP: [Y3C15-ECQV0] bgp_fsm_change_status : vrf default(0), Status: OpenConfirm established_peers 0 for Outgoing
+2026/01/20 13:48:55 BGP: [ZZPVC-3AHMF] 10.0.0.2 fd 25 went from OpenSent to OpenConfirm for Outgoing
+2026/01/20 13:48:55 debugging: BGP: [WNM1E-D314G] 10.0.0.2 rcv OPEN, version 4, remote-as (in open) 65001, holdtime 180, id 2.2.2.2
+2026/01/20 13:48:55 debugging: BGP: [QG29C-5TSVS] 10.0.0.2 rcv OPEN w/ OPTION parameter len: 97
+2026/01/20 13:48:55 debugging: BGP: [NVZPF-5ST3B] 10.0.0.2 rcvd OPEN w/ optional parameter type 2 (Capability) len 6
+2026/01/20 13:48:55 debugging: BGP: [SCW43-WN4M1] 10.0.0.2 OPEN has MultiProtocol Extensions capability (1), length 4
+2026/01/20 13:48:55 debugging: BGP: [VXVH9-3MXR0] 10.0.0.2 OPEN has MultiProtocol Extensions capability for afi/safi: link-state/link-state
+2026/01/20 13:48:55 debugging: BGP: [NVZPF-5ST3B] 10.0.0.2 rcvd OPEN w/ optional parameter type 2 (Capability) len 2
+2026/01/20 13:48:55 debugging: BGP: [SCW43-WN4M1] 10.0.0.2 OPEN has Route Refresh capability (2), length 0
+2026/01/20 13:48:55 debugging: BGP: [NVZPF-5ST3B] 10.0.0.2 rcvd OPEN w/ optional parameter type 2 (Capability) len 2
+2026/01/20 13:48:55 debugging: BGP: [SCW43-WN4M1] 10.0.0.2 OPEN has Enhanced Route Refresh capability (70), length 0
+2026/01/20 13:48:55 debugging: BGP: [NVZPF-5ST3B] 10.0.0.2 rcvd OPEN w/ optional parameter type 2 (Capability) len 6
+2026/01/20 13:48:55 debugging: BGP: [SCW43-WN4M1] 10.0.0.2 OPEN has 4-octet AS number capability (65), length 4
+2026/01/20 13:48:55 debugging: BGP: [NVZPF-5ST3B] 10.0.0.2 rcvd OPEN w/ optional parameter type 2 (Capability) len 2
+2026/01/20 13:48:55 debugging: BGP: [SCW43-WN4M1] 10.0.0.2 OPEN has BGP Extended Message capability (6), length 0
+2026/01/20 13:48:55 debugging: BGP: [NVZPF-5ST3B] 10.0.0.2 rcvd OPEN w/ optional parameter type 2 (Capability) len 6
+2026/01/20 13:48:55 debugging: BGP: [SCW43-WN4M1] 10.0.0.2 OPEN has AddPath capability (69), length 4
+2026/01/20 13:48:55 debugging: BGP: [SBSKM-G6QBW] 10.0.0.2 OPEN has AddPath capability for afi/safi: link-state/link-state, receive
+2026/01/20 13:48:55 debugging: BGP: [NVZPF-5ST3B] 10.0.0.2 rcvd OPEN w/ optional parameter type 2 (Capability) len 7
+2026/01/20 13:48:55 debugging: BGP: [SCW43-WN4M1] 10.0.0.2 OPEN has Paths-Limit capability (76), length 5
+2026/01/20 13:48:55 debugging: BGP: [MSJ7S-E9MRG] 10.0.0.2 OPEN has Paths-Limit capability for afi/safi: link-state/link-state limit: 0
+2026/01/20 13:48:55 debugging: BGP: [NVZPF-5ST3B] 10.0.0.2 rcvd OPEN w/ optional parameter type 2 (Capability) len 11
+2026/01/20 13:48:55 debugging: BGP: [SCW43-WN4M1] 10.0.0.2 OPEN has FQDN capability (73), length 9
+2026/01/20 13:48:55 debugging: BGP: [MR6EG-NS6N7] 10.0.0.2 received hostname router2, domainname (null)
+2026/01/20 13:48:55 debugging: BGP: [NVZPF-5ST3B] 10.0.0.2 rcvd OPEN w/ optional parameter type 2 (Capability) len 4
+2026/01/20 13:48:55 debugging: BGP: [SCW43-WN4M1] 10.0.0.2 OPEN has Graceful Restart capability (64), length 2
+2026/01/20 13:48:55 debugging: BGP: [V30NV-6FS3W] 10.0.0.2(router2) OPEN has GR capability, Restart time 120 R-bit SET N-bit SET
+2026/01/20 13:48:55 debugging: BGP: [NVZPF-5ST3B] 10.0.0.2 rcvd OPEN w/ optional parameter type 2 (Capability) len 9
+2026/01/20 13:48:55 debugging: BGP: [SCW43-WN4M1] 10.0.0.2 OPEN has Long-lived BGP Graceful Restart capability (71), length 7
+2026/01/20 13:48:55 debugging: BGP: [ZVHDJ-HW40B] 10.0.0.2 Addr-family link-state/link-state(afi/safi) not enabled. Ignore the Long-lived Graceful Restart capability
+2026/01/20 13:48:55 debugging: BGP: [NVZPF-5ST3B] 10.0.0.2 rcvd OPEN w/ optional parameter type 2 (Capability) len 20
+2026/01/20 13:48:55 debugging: BGP: [SCW43-WN4M1] 10.0.0.2 OPEN has Software Version capability (75), length 18
+2026/01/20 13:48:55 debugging: BGP: [N5H8N-2BZ13] 10.0.0.2 received Software Version: FRRouting/10.6-dev
+2026/01/20 13:48:55 debugging: BGP: [YMS6M-YHVP0] 10.0.0.2 [FSM] Receive_OPEN_message (OpenSent->OpenConfirm), fd 25 for Outgoing
+2026/01/20 13:48:55 debugging: BGP: [Y3C15-ECQV0] bgp_fsm_change_status : vrf default(0), Status: OpenConfirm established_peers 0 for Outgoing
+2026/01/20 13:48:55 debugging: BGP: [ZZPVC-3AHMF] 10.0.0.2 fd 25 went from OpenSent to OpenConfirm for Outgoing
+2026/01/20 13:48:55 BGP: [YMS6M-YHVP0] 10.0.0.2 [FSM] Receive_KEEPALIVE_message (OpenConfirm->Established), fd 25 for Outgoing
+2026/01/20 13:48:55 BGP: [Y3C15-ECQV0] bgp_fsm_change_status : vrf default(0), Status: Established established_peers 1 for Outgoing
+2026/01/20 13:48:55 BGP: [ZZPVC-3AHMF] 10.0.0.2 fd 25 went from OpenConfirm to Established for Outgoing
+2026/01/20 13:48:55 BGP: [V4R0W-D4WGF] 10.0.0.2(Unknown) Update Group Hash: sort: 1 sub_sort: 0 UpdGrpFlags: 0 UpdGrpAFFlags: 16777219
+2026/01/20 13:48:55 BGP: [NVVBY-K8MCE] 10.0.0.2(Unknown) Update Group Hash: addpath: 4 UpdGrpCapFlag: 256 UpdGrpCapAFFlag: 2048 route_adv: 0 change local as: 0, as_path_loop_detection: 0
+2026/01/20 13:48:55 BGP: [X4CQ0-63QKB] 10.0.0.2(Unknown) Update Group Hash: addpath paths-limit: (send 0, receive 0)
+2026/01/20 13:48:55 BGP: [XHN6Y-FHQSC] 10.0.0.2(Unknown) Update Group Hash: Link-Local Next Hop capability:
+2026/01/20 13:48:55 BGP: [Z8Q37-65KK3] 10.0.0.2(Unknown) Update Group Hash: max packet size: 65535 pmax_out: 0 Peer Group: (NONE) rmap out: (NONE)
+2026/01/20 13:48:55 BGP: [SM2F3-HRYKP] 10.0.0.2(Unknown) Update Group Hash: dlist out: (NONE) plist out: (NONE) aslist out: (NONE) usmap out: (NONE) advmap: (NONE) 0
+2026/01/20 13:48:55 BGP: [V8B3M-T6VFC] 10.0.0.2(Unknown) Update Group Hash: default rmap: (NONE) shared network and afi active network: 0
+2026/01/20 13:48:55 BGP: [Y5EX3-GHT5V] 10.0.0.2(Unknown) Update Group Hash: Lonesoul: 0 ORF prefix: 0 max prefix out: 0
+2026/01/20 13:48:55 BGP: [X19K7-9V4K2] 10.0.0.2(Unknown) Update Group Hash: local role: 255 AIGP: 0 SOO: (NONE)
+2026/01/20 13:48:55 BGP: [JW3N0-RCE28] 10.0.0.2(Unknown) Update Group Hash: IPv6 nexthop-local unchanged: 0 IPv6 global fe80::8000:feff:fefd:997e
+2026/01/20 13:48:55 BGP: [SQ314-QBJCR] 10.0.0.2(Unknown) Update Group Hash key: 2189553817
+2026/01/20 13:48:55 debugging: BGP: [YMS6M-YHVP0] 10.0.0.2 [FSM] Receive_KEEPALIVE_message (OpenConfirm->Established), fd 25 for Outgoing
+2026/01/20 13:48:55 debugging: BGP: [Y3C15-ECQV0] bgp_fsm_change_status : vrf default(0), Status: Established established_peers 1 for Outgoing
+2026/01/20 13:48:55 debugging: BGP: [ZZPVC-3AHMF] 10.0.0.2 fd 25 went from OpenConfirm to Established for Outgoing
+2026/01/20 13:48:55 debugging: BGP: [V4R0W-D4WGF] 10.0.0.2(Unknown) Update Group Hash: sort: 1 sub_sort: 0 UpdGrpFlags: 0 UpdGrpAFFlags: 16777219
+2026/01/20 13:48:55 debugging: BGP: [NVVBY-K8MCE] 10.0.0.2(Unknown) Update Group Hash: addpath: 4 UpdGrpCapFlag: 256 UpdGrpCapAFFlag: 2048 route_adv: 0 change local as: 0, as_path_loop_detection: 0
+2026/01/20 13:48:55 debugging: BGP: [X4CQ0-63QKB] 10.0.0.2(Unknown) Update Group Hash: addpath paths-limit: (send 0, receive 0)
+2026/01/20 13:48:55 debugging: BGP: [XHN6Y-FHQSC] 10.0.0.2(Unknown) Update Group Hash: Link-Local Next Hop capability:
+2026/01/20 13:48:55 debugging: BGP: [Z8Q37-65KK3] 10.0.0.2(Unknown) Update Group Hash: max packet size: 65535 pmax_out: 0 Peer Group: (NONE) rmap out: (NONE)
+2026/01/20 13:48:55 debugging: BGP: [SM2F3-HRYKP] 10.0.0.2(Unknown) Update Group Hash: dlist out: (NONE) plist out: (NONE) aslist out: (NONE) usmap out: (NONE) advmap: (NONE) 0
+2026/01/20 13:48:55 debugging: BGP: [V8B3M-T6VFC] 10.0.0.2(Unknown) Update Group Hash: default rmap: (NONE) shared network and afi active network: 0
+2026/01/20 13:48:55 debugging: BGP: [Y5EX3-GHT5V] 10.0.0.2(Unknown) Update Group Hash: Lonesoul: 0 ORF prefix: 0 max prefix out: 0
+2026/01/20 13:48:55 debugging: BGP: [X19K7-9V4K2] 10.0.0.2(Unknown) Update Group Hash: local role: 255 AIGP: 0 SOO: (NONE)
+2026/01/20 13:48:55 debugging: BGP: [JW3N0-RCE28] 10.0.0.2(Unknown) Update Group Hash: IPv6 nexthop-local unchanged: 0 IPv6 global fe80::8000:feff:fefd:997e
+2026/01/20 13:48:55 debugging: BGP: [SQ314-QBJCR] 10.0.0.2(Unknown) Update Group Hash key: 2189553817
+2026/01/20 13:48:55 BGP: [GB3VH-EAZK8] 10.0.0.2 [FSM] Timer (routeadv timer expire for Outgoing)
+2026/01/20 13:48:55 debugging: BGP: [GB3VH-EAZK8] 10.0.0.2 [FSM] Timer (routeadv timer expire for Outgoing)
+2026/01/20 13:48:56 BGP: [K9G3A-CJ5QQ] u1:s1 announcing routes upon coalesce timer expiry(1050 ms)
+2026/01/20 13:48:56 debugging: BGP: [K9G3A-CJ5QQ] u1:s1 announcing routes upon coalesce timer expiry(1050 ms)
+2026/01/20 13:48:56 BGP: [GB3VH-EAZK8] 10.0.0.2 [FSM] Timer (routeadv timer expire for Outgoing)
+2026/01/20 13:48:56 debugging: BGP: [GB3VH-EAZK8] 10.0.0.2 [FSM] Timer (routeadv timer expire for Outgoing)
+2026/01/20 13:48:56 BGP: [ZP3RE-J4Q8C] send End-of-RIB for Link State to 10.0.0.2
+2026/01/20 13:48:56 debugging: BGP: [ZP3RE-J4Q8C] send End-of-RIB for Link State to 10.0.0.2
+2026/01/20 13:48:56 BGP: [M59KS-A3ZXZ] bgp_update_receive_eor: rcvd End-of-RIB for Link State from 10.0.0.2 in vrf default
+2026/01/20 13:48:56 informational: BGP: [M59KS-A3ZXZ] bgp_update_receive_eor: rcvd End-of-RIB for Link State from 10.0.0.2 in vrf default
+2026/01/20 13:49:24 BGP: [YPZ8F-GWE9H] bgp_linkstate_poll_timer: Polling link-state information
+2026/01/20 13:49:24 BGP: [JT1H6-JDXZ3] bgp_linkstate_poll_timer: Initialized linkstate cache
+2026/01/20 13:49:24 BGP: [TYH3G-Y6BRB] read_interface_linkstate: Read link-state for eth0 (index=2, status=UP, bw=0 bps)
+2026/01/20 13:49:24 BGP: [RP3MT-3PZQ0] bgp_linkstate_poll_timer: New interface detected: eth0, calling linkstate_add()
+2026/01/20 13:49:24 BGP: [HK696-0G90E] linkstate_add: Adding link-state for eth0 (status=1, bw=0, metric=10)
+2026/01/20 13:49:24 BGP: [MWKN3-W59K9] encode_link_attributes: Encoded 13 bytes of Link Attribute TLVs for eth0 (SAFI=BGP-LS)
+2026/01/20 13:49:24 BGP: [KWMDG-HG9QH] bgp_linkstate_if_map_init: Initialized linkstate interface map
+2026/01/20 13:49:24 BGP: [WCBWX-Y252N] linkstate_add: Added eth0 to interface map (hash table)
+2026/01/20 13:49:24 BGP: [TXTN3-QQWT0] linkstate_add: Successfully added link-state for eth0
+2026/01/20 13:49:24 BGP: [RPD98-3WABF] bgp_linkstate_poll_timer: Added new interface eth0 to cache and RIB
+2026/01/20 13:49:24 debugging: BGP: [YPZ8F-GWE9H] bgp_linkstate_poll_timer: Polling link-state information
+2026/01/20 13:49:24 informational: BGP: [JT1H6-JDXZ3] bgp_linkstate_poll_timer: Initialized linkstate cache
+2026/01/20 13:49:24 informational: BGP: [TYH3G-Y6BRB] read_interface_linkstate: Read link-state for eth0 (index=2, status=UP, bw=0 bps)
+2026/01/20 13:49:24 informational: BGP: [RP3MT-3PZQ0] bgp_linkstate_poll_timer: New interface detected: eth0, calling linkstate_add()
+2026/01/20 13:49:24 informational: BGP: [HK696-0G90E] linkstate_add: Adding link-state for eth0 (status=1, bw=0, metric=10)
+2026/01/20 13:49:24 debugging: BGP: [MWKN3-W59K9] encode_link_attributes: Encoded 13 bytes of Link Attribute TLVs for eth0 (SAFI=BGP-LS)
+2026/01/20 13:49:24 informational: BGP: [KWMDG-HG9QH] bgp_linkstate_if_map_init: Initialized linkstate interface map
+2026/01/20 13:49:24 debugging: BGP: [WCBWX-Y252N] linkstate_add: Added eth0 to interface map (hash table)
+2026/01/20 13:49:24 informational: BGP: [TXTN3-QQWT0] linkstate_add: Successfully added link-state for eth0
+2026/01/20 13:49:24 informational: BGP: [RPD98-3WABF] bgp_linkstate_poll_timer: Added new interface eth0 to cache and RIB
+2026/01/20 13:49:24 BGP: [Z38CW-7NYWG] group_announce_route_walkcb: afi=link-state, safi=link-state, p=Unknown Unknown ID:0x0 {}/0(0x56b5bdd78110)
+2026/01/20 13:49:24 debugging: BGP: [Z38CW-7NYWG] group_announce_route_walkcb: afi=link-state, safi=link-state, p=Unknown Unknown ID:0x0 {}/0(0x56b5bdd78110)
+2026/01/20 13:49:39 BGP: [ZW1GY-R46JE] Terminating on signal
+2026/01/20 13:49:39 notifications: BGP: [ZW1GY-R46JE] Terminating on signal
+2026/01/20 13:49:39 BGP: [NC2TR-VN5DQ] 10.0.0.2(router2) configured Graceful-Restart, skipping unconfig notification
+2026/01/20 13:49:39 BGP: [Q8KQZ-W703Z] 10.0.0.2(router2) configured Graceful-Restart, skipping shutdown notification
+2026/01/20 13:49:39 BGP: [NC2TR-VN5DQ] 10.0.0.2(router2) configured Graceful-Restart, skipping unconfig notification
+2026/01/20 13:49:39 BGP: [PS6EE-GYMZN] peer_delete: peer 10.0.0.2(router2)
+2026/01/20 13:49:39 BGP: [V4R0W-D4WGF] 10.0.0.2(Unknown) Update Group Hash: sort: 1 sub_sort: 0 UpdGrpFlags: 0 UpdGrpAFFlags: 16777219
+2026/01/20 13:49:39 BGP: [NVVBY-K8MCE] 10.0.0.2(Unknown) Update Group Hash: addpath: 4 UpdGrpCapFlag: 256 UpdGrpCapAFFlag: 2048 route_adv: 0 change local as: 0, as_path_loop_detection: 0
+2026/01/20 13:49:39 BGP: [X4CQ0-63QKB] 10.0.0.2(Unknown) Update Group Hash: addpath paths-limit: (send 0, receive 0)
+2026/01/20 13:49:39 BGP: [XHN6Y-FHQSC] 10.0.0.2(Unknown) Update Group Hash: Link-Local Next Hop capability:
+2026/01/20 13:49:39 BGP: [Z8Q37-65KK3] 10.0.0.2(Unknown) Update Group Hash: max packet size: 65535 pmax_out: 0 Peer Group: (NONE) rmap out: (NONE)
+2026/01/20 13:49:39 BGP: [SM2F3-HRYKP] 10.0.0.2(Unknown) Update Group Hash: dlist out: (NONE) plist out: (NONE) aslist out: (NONE) usmap out: (NONE) advmap: (NONE) 0
+2026/01/20 13:49:39 BGP: [V8B3M-T6VFC] 10.0.0.2(Unknown) Update Group Hash: default rmap: (NONE) shared network and afi active network: 0
+2026/01/20 13:49:39 BGP: [Y5EX3-GHT5V] 10.0.0.2(Unknown) Update Group Hash: Lonesoul: 0 ORF prefix: 0 max prefix out: 0
+2026/01/20 13:49:39 BGP: [X19K7-9V4K2] 10.0.0.2(Unknown) Update Group Hash: local role: 255 AIGP: 0 SOO: (NONE)
+2026/01/20 13:49:39 BGP: [JW3N0-RCE28] 10.0.0.2(Unknown) Update Group Hash: IPv6 nexthop-local unchanged: 0 IPv6 global fe80::8000:feff:fefd:997e
+2026/01/20 13:49:39 BGP: [SQ314-QBJCR] 10.0.0.2(Unknown) Update Group Hash key: 2189553817
+2026/01/20 13:49:39 BGP: [Y3C15-ECQV0] bgp_fsm_change_status : vrf default(0), Status: Deleted established_peers 0 for Unknown
+2026/01/20 13:49:39 BGP: [Z7BHN-BQBCY] bgp_clear_route_all: peer 10.0.0.2(router2)
+2026/01/20 13:49:39 BGP: [ZZPVC-3AHMF] 10.0.0.2 fd -1 went from Established to Deleted for Unknown
+2026/01/20 13:49:39 BGP: [Q7K83-34XFB][EC 33554501] sendmsg_nexthop: zclient_send_message() failed
+2026/01/20 13:49:39 debugging: BGP: [NC2TR-VN5DQ] 10.0.0.2(router2) configured Graceful-Restart, skipping unconfig notification
+2026/01/20 13:49:39 debugging: BGP: [Q8KQZ-W703Z] 10.0.0.2(router2) configured Graceful-Restart, skipping shutdown notification
+2026/01/20 13:49:39 debugging: BGP: [NC2TR-VN5DQ] 10.0.0.2(router2) configured Graceful-Restart, skipping unconfig notification
+2026/01/20 13:49:39 debugging: BGP: [PS6EE-GYMZN] peer_delete: peer 10.0.0.2(router2)
+2026/01/20 13:49:39 debugging: BGP: [V4R0W-D4WGF] 10.0.0.2(Unknown) Update Group Hash: sort: 1 sub_sort: 0 UpdGrpFlags: 0 UpdGrpAFFlags: 16777219
+2026/01/20 13:49:39 debugging: BGP: [NVVBY-K8MCE] 10.0.0.2(Unknown) Update Group Hash: addpath: 4 UpdGrpCapFlag: 256 UpdGrpCapAFFlag: 2048 route_adv: 0 change local as: 0, as_path_loop_detection: 0
+2026/01/20 13:49:39 debugging: BGP: [X4CQ0-63QKB] 10.0.0.2(Unknown) Update Group Hash: addpath paths-limit: (send 0, receive 0)
+2026/01/20 13:49:39 debugging: BGP: [XHN6Y-FHQSC] 10.0.0.2(Unknown) Update Group Hash: Link-Local Next Hop capability:
+2026/01/20 13:49:39 debugging: BGP: [Z8Q37-65KK3] 10.0.0.2(Unknown) Update Group Hash: max packet size: 65535 pmax_out: 0 Peer Group: (NONE) rmap out: (NONE)
+2026/01/20 13:49:39 debugging: BGP: [SM2F3-HRYKP] 10.0.0.2(Unknown) Update Group Hash: dlist out: (NONE) plist out: (NONE) aslist out: (NONE) usmap out: (NONE) advmap: (NONE) 0
+2026/01/20 13:49:39 debugging: BGP: [V8B3M-T6VFC] 10.0.0.2(Unknown) Update Group Hash: default rmap: (NONE) shared network and afi active network: 0
+2026/01/20 13:49:39 debugging: BGP: [Y5EX3-GHT5V] 10.0.0.2(Unknown) Update Group Hash: Lonesoul: 0 ORF prefix: 0 max prefix out: 0
+2026/01/20 13:49:39 debugging: BGP: [X19K7-9V4K2] 10.0.0.2(Unknown) Update Group Hash: local role: 255 AIGP: 0 SOO: (NONE)
+2026/01/20 13:49:39 debugging: BGP: [JW3N0-RCE28] 10.0.0.2(Unknown) Update Group Hash: IPv6 nexthop-local unchanged: 0 IPv6 global fe80::8000:feff:fefd:997e
+2026/01/20 13:49:39 debugging: BGP: [SQ314-QBJCR] 10.0.0.2(Unknown) Update Group Hash key: 2189553817
+2026/01/20 13:49:39 debugging: BGP: [Y3C15-ECQV0] bgp_fsm_change_status : vrf default(0), Status: Deleted established_peers 0 for Unknown
+2026/01/20 13:49:39 debugging: BGP: [Z7BHN-BQBCY] bgp_clear_route_all: peer 10.0.0.2(router2)
+2026/01/20 13:49:39 debugging: BGP: [ZZPVC-3AHMF] 10.0.0.2 fd -1 went from Established to Deleted for Unknown
+2026/01/20 13:49:39 warnings: BGP: [Q7K83-34XFB][EC 33554501] sendmsg_nexthop: zclient_send_message() failed
+2026/01/20 13:49:39 BGP: [PS6EE-GYMZN] peer_delete: peer Static announcement(router1)
+2026/01/20 13:49:39 BGP: [Y3C15-ECQV0] bgp_fsm_change_status : vrf default(0), Status: Deleted established_peers 0 for Outgoing
+2026/01/20 13:49:39 BGP: [ZZPVC-3AHMF] Static announcement fd -1 went from Idle to Deleted for Outgoing
+2026/01/20 13:49:39 BGP: lib/memory.c:79: mt_count_free(): assertion (mt->n_alloc) failed
+2026/01/20 13:49:39 debugging: BGP: [PS6EE-GYMZN] peer_delete: peer Static announcement(router1)
+2026/01/20 13:49:39 debugging: BGP: [Y3C15-ECQV0] bgp_fsm_change_status : vrf default(0), Status: Deleted established_peers 0 for Outgoing
+2026/01/20 13:49:39 debugging: BGP: [ZZPVC-3AHMF] Static announcement fd -1 went from Idle to Deleted for Outgoing
+2026/01/20 13:49:39 critical: BGP: lib/memory.c:79: mt_count_free(): assertion (mt->n_alloc) failed
+BGP: Received signal 6 at 1768888179 (si_addr 0x81000023fe, PC 0x7d3a706969fc); aborting...
+critical: BGP: Received signal 6 at 1768888179 (si_addr 0x81000023fe, PC 0x7d3a706969fc); aborting...
+BGP: ?                                  7d3a70ae2d4c     7ffc4e6449b0 /home/bgp/FRR-main/lib/.libs/libfrr.so.0 (mapped at 0x7d3a70a00000)
+critical: BGP: ?                                  7d3a70ae2d4c     7ffc4e6449b0 /home/bgp/FRR-main/lib/.libs/libfrr.so.0 (mapped at 0x7d3a70a00000)
+BGP: ?                                  7d3a70b4c639     7ffc4e644ae0 /home/bgp/FRR-main/lib/.libs/libfrr.so.0 (mapped at 0x7d3a70a00000)
+critical: BGP: ?                                  7d3a70b4c639     7ffc4e644ae0 /home/bgp/FRR-main/lib/.libs/libfrr.so.0 (mapped at 0x7d3a70a00000)
+BGP: __sigaction+0x50                   7d3a70642520     7ffc4e644c40 /lib/x86_64-linux-gnu/libc.so.6 (mapped at 0x7d3a70600000)
+critical: BGP: __sigaction+0x50                   7d3a70642520     7ffc4e644c40 /lib/x86_64-linux-gnu/libc.so.6 (mapped at 0x7d3a70600000)
+BGP:     ---- signal ----
+critical: BGP:     ---- signal ----
+BGP: pthread_kill+0x12c                 7d3a706969fc     7ffc4e645930 /lib/x86_64-linux-gnu/libc.so.6 (mapped at 0x7d3a70600000)
+critical: BGP: pthread_kill+0x12c                 7d3a706969fc     7ffc4e645930 /lib/x86_64-linux-gnu/libc.so.6 (mapped at 0x7d3a70600000)
+BGP: raise+0x16                         7d3a70642476     7ffc4e6459f0 /lib/x86_64-linux-gnu/libc.so.6 (mapped at 0x7d3a70600000)
+critical: BGP: raise+0x16                         7d3a70642476     7ffc4e6459f0 /lib/x86_64-linux-gnu/libc.so.6 (mapped at 0x7d3a70600000)
+BGP: abort+0xd3                         7d3a706287f3     7ffc4e645a00 /lib/x86_64-linux-gnu/libc.so.6 (mapped at 0x7d3a70600000)
+critical: BGP: abort+0xd3                         7d3a706287f3     7ffc4e645a00 /lib/x86_64-linux-gnu/libc.so.6 (mapped at 0x7d3a70600000)
+BGP: ?                                  7d3a70b946cb     7ffc4e645b40 /home/bgp/FRR-main/lib/.libs/libfrr.so.0 (mapped at 0x7d3a70a00000)
+critical: BGP: ?                                  7d3a70b946cb     7ffc4e645b40 /home/bgp/FRR-main/lib/.libs/libfrr.so.0 (mapped at 0x7d3a70a00000)
+BGP: ?                                  7d3a70aebc0b     7ffc4e645c40 /home/bgp/FRR-main/lib/.libs/libfrr.so.0 (mapped at 0x7d3a70a00000)
+critical: BGP: ?                                  7d3a70aebc0b     7ffc4e645c40 /home/bgp/FRR-main/lib/.libs/libfrr.so.0 (mapped at 0x7d3a70a00000)
+BGP: ?                                  7d3a70aebe58     7ffc4e645c80 /home/bgp/FRR-main/lib/.libs/libfrr.so.0 (mapped at 0x7d3a70a00000)
+critical: BGP: ?                                  7d3a70aebe58     7ffc4e645c80 /home/bgp/FRR-main/lib/.libs/libfrr.so.0 (mapped at 0x7d3a70a00000)
+BGP: ?                                  56b591562946     7ffc4e645ca0 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+critical: BGP: ?                                  56b591562946     7ffc4e645ca0 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+BGP: ?                                  56b591562a45     7ffc4e645cc0 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+critical: BGP: ?                                  56b591562a45     7ffc4e645cc0 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+BGP: ?                                  56b591564ca1     7ffc4e645cf0 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+critical: BGP: ?                                  56b591564ca1     7ffc4e645cf0 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+BGP: ?                                  56b591564e22     7ffc4e645d60 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+critical: BGP: ?                                  56b591564e22     7ffc4e645d60 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+BGP: ?                                  56b591623e3f     7ffc4e645ef0 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+critical: BGP: ?                                  56b591623e3f     7ffc4e645ef0 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+BGP: ?                                  56b591623f74     7ffc4e645f10 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+critical: BGP: ?                                  56b591623f74     7ffc4e645f10 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+BGP: ?                                  56b591624576     7ffc4e645f30 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+critical: BGP: ?                                  56b591624576     7ffc4e645f30 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+BGP: ?                                  56b591637a8f     7ffc4e645f50 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+critical: BGP: ?                                  56b591637a8f     7ffc4e645f50 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+BGP: ?                                  56b591637b6d     7ffc4e645fa0 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+critical: BGP: ?                                  56b591637b6d     7ffc4e645fa0 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+BGP: ?                                  56b5916f2260     7ffc4e645fe0 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+critical: BGP: ?                                  56b5916f2260     7ffc4e645fe0 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+BGP: ?                                  56b59155f14c     7ffc4e6460d0 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+critical: BGP: ?                                  56b59155f14c     7ffc4e6460d0 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+BGP: ?                                  56b59155f031     7ffc4e646120 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+critical: BGP: ?                                  56b59155f031     7ffc4e646120 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+BGP: ?                                  7d3a70b4c3e7     7ffc4e646130 /home/bgp/FRR-main/lib/.libs/libfrr.so.0 (mapped at 0x7d3a70a00000)
+critical: BGP: ?                                  7d3a70b4c3e7     7ffc4e646130 /home/bgp/FRR-main/lib/.libs/libfrr.so.0 (mapped at 0x7d3a70a00000)
+BGP: ?                                  7d3a70b6858e     7ffc4e646150 /home/bgp/FRR-main/lib/.libs/libfrr.so.0 (mapped at 0x7d3a70a00000)
+critical: BGP: ?                                  7d3a70b6858e     7ffc4e646150 /home/bgp/FRR-main/lib/.libs/libfrr.so.0 (mapped at 0x7d3a70a00000)
+BGP: ?                                  7d3a70b688c4     7ffc4e6461e0 /home/bgp/FRR-main/lib/.libs/libfrr.so.0 (mapped at 0x7d3a70a00000)
+critical: BGP: ?                                  7d3a70b688c4     7ffc4e6461e0 /home/bgp/FRR-main/lib/.libs/libfrr.so.0 (mapped at 0x7d3a70a00000)
+BGP: ?                                  7d3a70ad5ddc     7ffc4e646220 /home/bgp/FRR-main/lib/.libs/libfrr.so.0 (mapped at 0x7d3a70a00000)
+critical: BGP: ?                                  7d3a70ad5ddc     7ffc4e646220 /home/bgp/FRR-main/lib/.libs/libfrr.so.0 (mapped at 0x7d3a70a00000)
+BGP: ?                                  56b59155fdb4     7ffc4e646340 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+critical: BGP: ?                                  56b59155fdb4     7ffc4e646340 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+BGP: __libc_init_first+0x90             7d3a70629d90     7ffc4e6463c0 /lib/x86_64-linux-gnu/libc.so.6 (mapped at 0x7d3a70600000)
+critical: BGP: __libc_init_first+0x90             7d3a70629d90     7ffc4e6463c0 /lib/x86_64-linux-gnu/libc.so.6 (mapped at 0x7d3a70600000)
+BGP: __libc_start_main+0x80             7d3a70629e40     7ffc4e646460 /lib/x86_64-linux-gnu/libc.so.6 (mapped at 0x7d3a70600000)
+critical: BGP: __libc_start_main+0x80             7d3a70629e40     7ffc4e646460 /lib/x86_64-linux-gnu/libc.so.6 (mapped at 0x7d3a70600000)
+BGP: ?                                  56b59155dff5     7ffc4e6464b0 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+critical: BGP: ?                                  56b59155dff5     7ffc4e6464b0 /home/bgp/FRR-main/bgpd/.libs/bgpd (mapped at 0x56b59146c000)
+BGP: no thread information available
+critical: BGP: no thread information available

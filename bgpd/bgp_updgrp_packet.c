@@ -1054,6 +1054,12 @@ struct bpacket *subgroup_withdraw_packet(struct update_subgroup *subgrp)
 				   subgrp->update_group->id, subgrp->id,
 				   pfx_buf);
 		}
+		
+		/* [BGP-LS-DEBUG] 记录 MP_UNREACH 编码详情 */
+		if (afi == AFI_LINKSTATE) {
+			zlog_info("[BGP-LS-WITHDRAW] Encoded MP_UNREACH for AFI=%u SAFI=%u prefix_len=%u num_pfx=%d",
+			          afi, safi, dest_p->prefixlen, num_pfx);
+		}
 
 		subgrp->scount--;
 

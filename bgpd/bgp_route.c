@@ -4091,6 +4091,10 @@ static void bgp_process_main_one(struct bgp *bgp, struct bgp_dest *dest,
 	}
 	//*****// */
 	// 这是最常见的调用路径：最佳路径发生了变化，需要向对等体通告//
+	if (afi == AFI_LINKSTATE) {
+		printf("[BGP-LS-INFO] bgp_process: calling group_announce_route with new_select=%p\n", new_select);
+		fflush(stdout);
+	}
 	group_announce_route(bgp, afi, safi, dest, new_select);
 
 	/* unicast routes must also be annouced to labeled-unicast update-groups
@@ -7589,6 +7593,11 @@ void bgp_cleanup_routes(struct bgp *bgp)
 			assert(dest);
 		}
 	}
+
+	/* Cleanup BGP-LS dedicated table */
+	if (bgp->ls_table) {
+		bgp_cleanup_table(bgp, bgp->ls_table, AFI_LINKSTATE, SAFI_LINKSTATE);
+	}
 }
 
 bool bgp_addpath_encode_rx(struct peer *peer, afi_t afi, safi_t safi)
@@ -10440,7 +10449,7 @@ static void route_vty_out_route(struct bgp_dest *dest, const struct prefix *p, s
 			json_object_int_add(json, "version", dest->version);
 			bgp_linkstate_nlri_prefix_json(
 				json, p->u.prefix_linkstate.nlri_type,
-				p->u.prefix_linkstate.ptr, p->prefixlen);
+				p->u.prefix_linkstate.ls_data, p->prefixlen);
 		} else
 			len = vty_out(vty, "%pFX", p);
 	} else {
@@ -12856,7 +12865,7 @@ void route_vty_out_detail(struct vty *vty, struct bgp *bgp, struct bgp_dest *bn,
 		if (json_paths)
 			bgp_linkstate_nlri_prefix_json(
 				json_path, bn->rn->p.u.prefix_linkstate.nlri_type,
-				bn->rn->p.u.prefix_linkstate.ptr, bn->rn->p.prefixlen);
+				bn->rn->p.u.prefix_linkstate.ls_data, bn->rn->p.prefixlen);
 
 		/* BGP Link-State Attributes */
 		if (attr->link_state) {

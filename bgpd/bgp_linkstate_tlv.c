@@ -12,6 +12,7 @@
 #include "bgpd/bgp_debug.h"
 #include "bgpd/bgp_errors.h"
 #include "bgpd/bgp_linkstate_tlv.h"
+#include "bgpd/bgp_linkstate.h"  /* For struct linkstate_info */
 
 
 static bool bgp_linkstate_nlri_value_display(char *buf, size_t size,
@@ -300,7 +301,7 @@ static struct bgp_ls_spf_ctx *bgp_ls_spf_get_ctx(struct peer *peer)
  *      - TLV 1184 (SPF Status): optional, default=0 (reachable)
  *      - TLV 1095 (IGP Metric): mandatory for Link
  *      - TLV 1155 (Prefix Metric): mandatory for Prefix
- *   2. Parse NLRI descriptor TLVs (p->u.prefix_linkstate.ptr):
+ *   2. Parse NLRI descriptor TLVs (semantic data):
  *      - Node/Link/Prefix identifiers for LSDB key
  *      - TLV 1185 (AF Link Descriptor) for multi-AF links
  *   3. Sequence-number comparison (RFC9815 Section 5.1):
@@ -374,7 +375,7 @@ static void bgp_ls_spf_lsdb_update(struct bgp_ls_spf_ctx *ctx,
 
 	/* Step 2: Extract NLRI type and generate LSDB key (simplified hash) */
 	nlri_type = p->u.prefix_linkstate.nlri_type;
-	key = (uint64_t)nlri_type << 56 | (p->u.prefix_linkstate.ptr & 0xFFFFFFFFFFFFFF);
+	key = (uint64_t)nlri_type << 56 | ((uintptr_t)p->u.prefix_linkstate.ls_data & 0xFFFFFFFFFFFFFF);
 
 	/* Step 3: Update LSDB based on NLRI type with seq check */
 	switch (nlri_type) {
@@ -645,7 +646,8 @@ int bgp_nlri_parse_linkstate(struct peer *peer, struct attr *attr,
 
 		//  设置prefix信息
 		p.family = AF_LINKSTATE;
-		p.u.prefix_linkstate.ptr = (uintptr_t)pnt;
+		/* TODO: Parsing not yet implemented for semantic data model */
+		/* p.u.prefix_linkstate.ls_data = ...; */
 		p.prefixlen = length;
 
 		if (BGP_DEBUG(linkstate, LINKSTATE)) {
@@ -694,7 +696,7 @@ static int bgp_ls_spf_handle_nlri(struct peer *peer, struct attr *attr,
     if (bgp_ls_spf_should_run(ctx))
         bgp_ls_spf_run(ctx);
 
-	if (withdraw)
+    if (withdraw)
 		bgp_withdraw(peer, p, 0, afi, safi, ZEBRA_ROUTE_BGP,
 			     BGP_ROUTE_NORMAL, NULL, NULL, 0);
 	else
@@ -736,7 +738,8 @@ int bgp_nlri_parse_bgpls_spf(struct peer *peer, struct attr *attr,
 		}
 
 		p.family = AF_LINKSTATE;
-		p.u.prefix_linkstate.ptr = (uintptr_t)pnt;
+		/* TODO: Parsing not yet implemented for semantic data model */
+		/* p.u.prefix_linkstate.ls_data = ...; */
 		p.prefixlen = length;
 
 		if (BGP_DEBUG(linkstate, LINKSTATE))
@@ -754,13 +757,96 @@ int bgp_nlri_parse_bgpls_spf(struct peer *peer, struct attr *attr,
  */
 void bgp_nlri_encode_linkstate(struct stream *s, const struct prefix *p)
 {
-	/* NLRI type */
-	stream_putw(s, p->u.prefix_linkstate.nlri_type);
+	uint8_t nlri_buf[256];
+	size_t offset = 0;
 
-	/* Size */
-	stream_putw(s, p->prefixlen);
+	/* Get semantic data from prefix */
+	const struct linkstate_info *ls_info = p->u.prefix_linkstate.ls_data;
+	
+	if (!ls_info) {
+		zlog_err("BGPLS: encode_linkstate called with NULL ls_data");
+		return;
+	}
 
-	stream_put(s, (const void *)p->u.prefix_linkstate.ptr, p->prefixlen);
+	/* Encode Link NLRI directly into temporary buffer */
+	/* 1. Protocol-ID (1 byte) */
+	nlri_buf[offset++] = 0x05;
+
+	/* 2. Identifier (8 bytes) */
+	uint64_t identifier = (uint64_t)ls_info->if_index;
+	nlri_buf[offset++] = (identifier >> 56) & 0xFF;
+	nlri_buf[offset++] = (identifier >> 48) & 0xFF;
+	nlri_buf[offset++] = (identifier >> 40) & 0xFF;
+	nlri_buf[offset++] = (identifier >> 32) & 0xFF;
+	nlri_buf[offset++] = (identifier >> 24) & 0xFF;
+	nlri_buf[offset++] = (identifier >> 16) & 0xFF;
+	nlri_buf[offset++] = (identifier >> 8) & 0xFF;
+	nlri_buf[offset++] = identifier & 0xFF;
+
+	/* 3. Local Node Descriptors (TLV 256) */
+	nlri_buf[offset++] = 0x01;
+	nlri_buf[offset++] = 0x00;
+	size_t local_node_len_offset = offset;
+	offset += 2;
+
+	/* Sub-TLV 515: IGP Router-ID */
+	nlri_buf[offset++] = 0x02;
+	nlri_buf[offset++] = 0x03;
+	nlri_buf[offset++] = 0x00;
+	nlri_buf[offset++] = 0x04;
+	
+	uint32_t router_id_be = htonl(ls_info->router_id.s_addr);
+	memcpy(&nlri_buf[offset], &router_id_be, 4);
+	offset += 4;
+
+	uint16_t local_node_len = offset - local_node_len_offset - 2;
+	nlri_buf[local_node_len_offset] = (local_node_len >> 8) & 0xFF;
+	nlri_buf[local_node_len_offset + 1] = local_node_len & 0xFF;
+
+	/* 4. Remote Node Descriptors (TLV 257) */
+	nlri_buf[offset++] = 0x01;
+	nlri_buf[offset++] = 0x01;
+	size_t remote_node_len_offset = offset;
+	offset += 2;
+
+	nlri_buf[offset++] = 0x02;
+	nlri_buf[offset++] = 0x03;
+	nlri_buf[offset++] = 0x00;
+	nlri_buf[offset++] = 0x04;
+	
+	uint32_t remote_router_id_be = htonl(ls_info->remote_router_id.s_addr);
+	memcpy(&nlri_buf[offset], &remote_router_id_be, 4);
+	offset += 4;
+
+	uint16_t remote_node_len = offset - remote_node_len_offset - 2;
+	nlri_buf[remote_node_len_offset] = (remote_node_len >> 8) & 0xFF;
+	nlri_buf[remote_node_len_offset + 1] = remote_node_len & 0xFF;
+
+	/* 5. Link Descriptors */
+	/* TLV 259: IPv4 Interface Address */
+	nlri_buf[offset++] = 0x01;
+	nlri_buf[offset++] = 0x03;
+	nlri_buf[offset++] = 0x00;
+	nlri_buf[offset++] = 0x04;
+	
+	uint32_t local_addr_be = htonl(ls_info->local_addr.s_addr);
+	memcpy(&nlri_buf[offset], &local_addr_be, 4);
+	offset += 4;
+
+	/* TLV 260: IPv4 Neighbor Address */
+	nlri_buf[offset++] = 0x01;
+	nlri_buf[offset++] = 0x04;
+	nlri_buf[offset++] = 0x00;
+	nlri_buf[offset++] = 0x04;
+	
+	uint32_t remote_addr_be = htonl(ls_info->remote_addr.s_addr);
+	memcpy(&nlri_buf[offset], &remote_addr_be, 4);
+	offset += 4;
+
+	/* Write to stream: Type + Length + Data */
+	stream_putw(s, 0x0002);  /* NLRI Type: Link */
+	stream_putw(s, offset);  /* NLRI Length */
+	stream_put(s, nlri_buf, offset);  /* NLRI Data */
 }
 
 static size_t bgp_linkstate_nlri_hexa_display(char *buf, size_t size,

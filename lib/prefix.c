@@ -254,16 +254,9 @@ int prefix_match(union prefixconstptr unet, union prefixconstptr upfx)
 		    p->u.prefix_linkstate.nlri_type)
 			return 0;
 
-		/* Set both prefix's head pointer. */
-		np = (const uint8_t *)&n->u.prefix_linkstate.ptr;
-		pp = (const uint8_t *)&p->u.prefix_linkstate.ptr;
-
-		offset = n->prefixlen; /* length is checked above */
-
-		while (offset--)
-			if (np[offset] != pp[offset])
-				return 0;
-		return 1;
+		/* For Link-State, compare semantic data pointers */
+		return (n->u.prefix_linkstate.ls_data ==
+			p->u.prefix_linkstate.ls_data);
 	}
 
 	/* Set both prefix's head pointer. */
@@ -396,13 +389,11 @@ void prefix_copy(union prefixptr udest, union prefixconstptr usrc)
 		memcpy((void *)dest->u.prefix_flowspec.ptr,
 		       (void *)src->u.prefix_flowspec.ptr, len);
 	} else if (src->family == AF_LINKSTATE) {
-		len = src->prefixlen;
+		/* For Link-State, shallow copy semantic data pointer */
 		dest->u.prefix_linkstate.nlri_type =
 			src->u.prefix_linkstate.nlri_type;
-		temp = XCALLOC(MTYPE_PREFIX_LINKSTATE, len);
-		dest->u.prefix_linkstate.ptr = (uintptr_t)temp;
-		memcpy((void *)dest->u.prefix_linkstate.ptr,
-		       (void *)src->u.prefix_linkstate.ptr, len);
+		dest->u.prefix_linkstate.ls_data =
+			src->u.prefix_linkstate.ls_data;
 	} else {
 		flog_err(EC_LIB_DEVELOPMENT,
 			 "prefix_copy(): Unknown address family %d",
@@ -496,8 +487,8 @@ int prefix_same(union prefixconstptr up1, union prefixconstptr up2)
 			if (p1->u.prefix_linkstate.nlri_type !=
 			    p2->u.prefix_linkstate.nlri_type)
 				return 0;
-			if (!memcmp(&p1->u.prefix_linkstate.ptr,
-				    &p2->u.prefix_linkstate.ptr, p2->prefixlen))
+			if (p1->u.prefix_linkstate.ls_data ==
+			    p2->u.prefix_linkstate.ls_data)
 				return 1;
 		}
 	}
@@ -548,20 +539,16 @@ int prefix_cmp(union prefixconstptr up1, union prefixconstptr up2)
 				return numcmp(pp1[offset], pp2[offset]);
 		return 0;
 	} else if (p1->family == AF_LINKSTATE) {
-		pp1 = (const uint8_t *)p1->u.prefix_linkstate.ptr;
-		pp2 = (const uint8_t *)p2->u.prefix_linkstate.ptr;
-
+		/* For Link-State, compare semantic data pointers as addresses */
 		if (p1->u.prefix_linkstate.nlri_type !=
 		    p2->u.prefix_linkstate.nlri_type)
+			return numcmp(p1->u.prefix_linkstate.nlri_type,
+				      p2->u.prefix_linkstate.nlri_type);
+
+		if (p1->u.prefix_linkstate.ls_data < p2->u.prefix_linkstate.ls_data)
+			return -1;
+		if (p1->u.prefix_linkstate.ls_data > p2->u.prefix_linkstate.ls_data)
 			return 1;
-
-		if (p1->prefixlen != p2->prefixlen)
-			return numcmp(p1->prefixlen, p2->prefixlen);
-
-		offset = p1->prefixlen;
-		while (offset--)
-			if (pp1[offset] != pp2[offset])
-				return numcmp(pp1[offset], pp2[offset]);
 		return 0;
 	}
 	pp1 = p1->u.val;
@@ -1258,19 +1245,11 @@ const char *prefix2str(union prefixconstptr pu, char *str, int size)
 		break;
 
 	case AF_LINKSTATE:
-		if (prefix_linkstate_display_hook)
-			snprintf(str, size, "%s/%d",
-				 prefix_linkstate_display_hook(
-					 buf, sizeof(buf),
-					 p->u.prefix_linkstate.nlri_type,
-					 p->u.prefix_linkstate.ptr,
-					 p->prefixlen),
-				 p->prefixlen);
-		else
-			snprintf(str, size, "%s/%d",
-				 bgp_linkstate_nlri_type_2str(
-					 p->u.prefix_linkstate.nlri_type),
-				 p->prefixlen);
+		/* For Link-State, display NLRI type and pointer to semantic data */
+		snprintf(str, size, "%s[%p]",
+			 bgp_linkstate_nlri_type_2str(
+				 p->u.prefix_linkstate.nlri_type),
+			 p->u.prefix_linkstate.ls_data);
 		break;
 
 	default:
@@ -1306,15 +1285,11 @@ static ssize_t prefixhost2str(struct fbuf *fbuf, union prefixconstptr pu)
 		return bputs(fbuf, buf);
 
 	case AF_LINKSTATE:
-		if (prefix_linkstate_display_hook)
-			prefix_linkstate_display_hook(
-				buf, sizeof(buf),
-				p->u.prefix_linkstate.nlri_type,
-				p->u.prefix_linkstate.ptr, p->prefixlen);
-		else
-			snprintf(buf, sizeof(buf), "%s",
-				 bgp_linkstate_nlri_type_2str(
-					 p->u.prefix_linkstate.nlri_type));
+		/* For Link-State, display NLRI type and semantic data pointer */
+		snprintf(buf, sizeof(buf), "%s[%p]",
+			 bgp_linkstate_nlri_type_2str(
+				 p->u.prefix_linkstate.nlri_type),
+			 p->u.prefix_linkstate.ls_data);
 		return bputs(fbuf, buf);
 	default:
 		return bprintfrr(fbuf, "{prefix.af=%dPF}", p->family);
@@ -1365,14 +1340,12 @@ void prefix_flowspec_ptr_free(struct prefix *p)
 
 void prefix_linkstate_ptr_free(struct prefix *p)
 {
-	void *temp;
-
-	if (!p || p->family != AF_LINKSTATE || !p->u.prefix_linkstate.ptr)
+	/* No-op: Link-State now uses semantic data pointers, no buffer to free */
+	if (!p || p->family != AF_LINKSTATE)
 		return;
-
-	temp = (void *)p->u.prefix_linkstate.ptr;
-	XFREE(MTYPE_PREFIX_LINKSTATE, temp);
-	p->u.prefix_linkstate.ptr = (uintptr_t)NULL;
+	
+	/* Just clear the pointer for safety */
+	p->u.prefix_linkstate.ls_data = NULL;
 }
 
 
@@ -1547,9 +1520,10 @@ unsigned prefix_hash_key(const void *pp)
 		prefix_flowspec_ptr_free(&copy);
 		return len;
 	} else if (((struct prefix *)pp)->family == AF_LINKSTATE) {
-		len = jhash((void *)copy.u.prefix_linkstate.ptr, copy.prefixlen,
+		/* Hash the pointer value itself for Link-State */
+		len = jhash(&copy.u.prefix_linkstate.ls_data,
+			    sizeof(copy.u.prefix_linkstate.ls_data),
 			    0x55aa5a5a);
-		prefix_linkstate_ptr_free(&copy);
 		return len;
 	}
 

@@ -743,6 +743,9 @@ struct bgp {
 	/* BGP routing information base.  */
 	struct bgp_table *rib[AFI_MAX][SAFI_MAX];
 
+	/* BGP-LS dedicated table (FRR 10.x) */
+	struct bgp_table *ls_table;
+
 	/* BGP table route-map.  */
 	struct bgp_rmap table_map[AFI_MAX][SAFI_MAX];
 
@@ -1019,6 +1022,16 @@ struct bgp {
 	uint64_t node_already_on_queue;
 	uint64_t node_deferred_on_queue;
 
+	/* BGP Link-State polling */
+	struct event *t_linkstate_poll;     /* Link-state polling timer */
+	uint32_t linkstate_poll_interval;   /* Polling interval in seconds */
+	struct hash *linkstate_if_map;      /* Interface name to prefix mapping (for O(1) delete) */
+	struct hash *linkstate_cache;       /* Interface state cache for change detection */
+	struct list *linkstate_if_list;     /* List of monitored interface names */
+
+	/* BGP Time-Variant Routing (TVR) state */
+	struct tvr_routing_state *tvr_state;/* TVR scheduler and timer state */
+	bool tvr_enabled;/* Whether TVR is enabled for this instance */
 	QOBJ_FIELDS;
 };
 DECLARE_QOBJ_TYPE(bgp);
@@ -2862,9 +2875,12 @@ static inline int afindex(afi_t afi, safi_t safi)
 			return BGP_AF_IPV4_FLOWSPEC;
 		case SAFI_LINKSTATE:
 		case SAFI_LINKSTATE_VPN:
+		case SAFI_BGPLS_SPF:
+		case SAFI_BGPLS_TVR:
 		case SAFI_EVPN:
 		case SAFI_UNSPEC:
 		case SAFI_MAX:
+		default:
 			return BGP_AF_MAX;
 		}
 		break;
@@ -2884,9 +2900,12 @@ static inline int afindex(afi_t afi, safi_t safi)
 			return BGP_AF_IPV6_FLOWSPEC;
 		case SAFI_LINKSTATE:
 		case SAFI_LINKSTATE_VPN:
+		case SAFI_BGPLS_SPF:
+		case SAFI_BGPLS_TVR:
 		case SAFI_EVPN:
 		case SAFI_UNSPEC:
 		case SAFI_MAX:
+		default:
 			return BGP_AF_MAX;
 		}
 		break;
@@ -2903,7 +2922,10 @@ static inline int afindex(afi_t afi, safi_t safi)
 		case SAFI_UNSPEC:
 		case SAFI_LINKSTATE:
 		case SAFI_LINKSTATE_VPN:
+		case SAFI_BGPLS_SPF:
+		case SAFI_BGPLS_TVR:
 		case SAFI_MAX:
+		default:
 			return BGP_AF_MAX;
 		}
 		break;
@@ -2913,6 +2935,9 @@ static inline int afindex(afi_t afi, safi_t safi)
 			return BGP_AF_LINKSTATE;
 		case SAFI_LINKSTATE_VPN:
 			return BGP_AF_LINKSTATE_VPN;
+		case SAFI_BGPLS_SPF:
+			return BGP_AF_BGPLS_SPF;
+		case SAFI_BGPLS_TVR:
 		case SAFI_EVPN:
 		case SAFI_UNICAST:
 		case SAFI_MULTICAST:
@@ -2922,6 +2947,7 @@ static inline int afindex(afi_t afi, safi_t safi)
 		case SAFI_FLOWSPEC:
 		case SAFI_UNSPEC:
 		case SAFI_MAX:
+		default:
 			return BGP_AF_MAX;
 		}
 		break;
@@ -2930,6 +2956,7 @@ static inline int afindex(afi_t afi, safi_t safi)
 		return BGP_AF_MAX;
 	}
 
+	zlog_err("afindex: Unhandled AFI=%d SAFI=%d combination", afi, safi);
 	assert(!"Reached end of function we should never hit");
 	return BGP_AF_MAX;
 }

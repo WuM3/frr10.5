@@ -1,0 +1,34 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-01-21T14:00:00Z",
+  "links": [
+    {
+      "if_name": "r1-eth0",
+      "if_index": 2,
+      "nlri": {
+        "protocol_id": 5,
+        "identifier": 123456,
+        "local_node": {
+          "router_id": "192.168.1.1"
+        },
+        "remote_node": {
+          "router_id": "192.168.1.2"
+        },
+        "link_descriptors": {
+          "local_ipv4": "10.0.0.1",
+          "remote_ipv4": "10.0.0.2"
+        }
+      },
+      "attributes": {
+        "oper_status": 1,
+        "max_bandwidth": 1000000000,
+        "te_metric": 10,
+        "igp_metric": 10,
+        "admin_group": 0,
+        "unreserved_bw": [1000000000, 1000000000, 1000000000, 1000000000, 1000000000, 1000000000, 1000000000, 1000000000],
+        "spf_sequence_number": 100,
+        "spf_status": 0
+      }
+    }
+  ]
+}
