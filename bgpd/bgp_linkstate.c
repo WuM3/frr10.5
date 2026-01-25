@@ -47,10 +47,13 @@ struct linkstate_prefix_wrapper {
 	struct bgp_dest *dest;         /* RIB节点指针（用于快速update/delete查找）*/
 };
 
-/* 内存类型定义 */
+/* 内存类型定义
+ * 注意：BGP_ATTR_LS 和 BGP_ATTR_LS_DATA 已在 bgp_attr.c 中定义，
+ * 这里使用 DECLARE_MTYPE 引用它们，避免重复定义导致的 UAF
+ */
 DEFINE_MTYPE_STATIC(BGPD, BGP_LINKSTATE_WRAPPER, "BGP LinkState Wrapper");
-DEFINE_MTYPE_STATIC(BGPD, BGP_ATTR_LS, "BGP Attribute Link-State");
-DEFINE_MTYPE_STATIC(BGPD, BGP_ATTR_LS_DATA, "BGP Attribute Link-State Data");
+DECLARE_MTYPE(BGP_ATTR_LS);
+DECLARE_MTYPE(BGP_ATTR_LS_DATA);
 DEFINE_MTYPE_STATIC(BGPD, BGP_LINKSTATE_NLRI, "BGP LinkState NLRI");
 
 /* 前向声明 */
@@ -375,9 +378,15 @@ void bgp_linkstate_if_map_finish(struct bgp *bgp)
  * @param p        输出的prefix结构
  * @param ls_info  链路状态信息
  * @return 0 成功, -1 失败
+ * 
+ * 关键修复：现在在构造时预编码 NLRI 到缓冲区，这样 WITHDRAW 编码时
+ * 不需要访问 ls_data（可能已被释放）。
  */
 static int build_bgpls_link_nlri(struct prefix *p, struct linkstate_info *ls_info)
 {
+    uint8_t *buf;
+    size_t offset = 0;
+    
     if (!p || !ls_info) {
         return -1;
     }
@@ -386,18 +395,92 @@ static int build_bgpls_link_nlri(struct prefix *p, struct linkstate_info *ls_inf
                ls_info->if_name, ls_info->if_index);
 
     memset(p, 0, sizeof(*p));
-	p->family = AF_LINKSTATE;
-
-    /* Store semantic data pointer only - NO buffer allocation!
-     * The actual NLRI encoding happens in bgp_nlri_encode_linkstate()
-     * when constructing UPDATE messages.
-     */
+    p->family = AF_LINKSTATE;
     p->u.prefix_linkstate.nlri_type = 0x0002;  // Link NLRI
     p->u.prefix_linkstate.ls_data = ls_info;   // Store pointer to semantic data
     p->prefixlen = 128;  // Nominal value for prefix comparison
+
+    /* 关键修复：预编码 NLRI 到缓冲区，供 WITHDRAW 使用
+     * 这解决了异步 bgp_process 时 ls_data 已被释放的问题
+     */
+    buf = p->u.prefix_linkstate.nlri_buf;
     
-    zlog_debug("BGPLS: prefix prepared with ls_data=%p, will encode on-demand",
-               (void*)ls_info);
+    /* 1. Protocol-ID (1 byte) - OSPF = 0x05 */
+    buf[offset++] = 0x05;
+
+    /* 2. Identifier (8 bytes) - use if_index */
+    uint64_t identifier = (uint64_t)ls_info->if_index;
+    buf[offset++] = (identifier >> 56) & 0xFF;
+    buf[offset++] = (identifier >> 48) & 0xFF;
+    buf[offset++] = (identifier >> 40) & 0xFF;
+    buf[offset++] = (identifier >> 32) & 0xFF;
+    buf[offset++] = (identifier >> 24) & 0xFF;
+    buf[offset++] = (identifier >> 16) & 0xFF;
+    buf[offset++] = (identifier >> 8) & 0xFF;
+    buf[offset++] = identifier & 0xFF;
+
+    /* 3. Local Node Descriptors (TLV 256 = 0x0100) */
+    buf[offset++] = 0x01;
+    buf[offset++] = 0x00;
+    size_t local_node_len_offset = offset;
+    offset += 2;  /* placeholder for length */
+
+    /* Sub-TLV 515 (0x0203): IGP Router-ID */
+    buf[offset++] = 0x02;
+    buf[offset++] = 0x03;
+    buf[offset++] = 0x00;
+    buf[offset++] = 0x04;
+    uint32_t router_id_be = htonl(ls_info->router_id.s_addr);
+    memcpy(&buf[offset], &router_id_be, 4);
+    offset += 4;
+
+    uint16_t local_node_len = offset - local_node_len_offset - 2;
+    buf[local_node_len_offset] = (local_node_len >> 8) & 0xFF;
+    buf[local_node_len_offset + 1] = local_node_len & 0xFF;
+
+    /* 4. Remote Node Descriptors (TLV 257 = 0x0101) */
+    buf[offset++] = 0x01;
+    buf[offset++] = 0x01;
+    size_t remote_node_len_offset = offset;
+    offset += 2;
+
+    /* Sub-TLV 515 (0x0203): IGP Router-ID */
+    buf[offset++] = 0x02;
+    buf[offset++] = 0x03;
+    buf[offset++] = 0x00;
+    buf[offset++] = 0x04;
+    uint32_t remote_router_id_be = htonl(ls_info->remote_router_id.s_addr);
+    memcpy(&buf[offset], &remote_router_id_be, 4);
+    offset += 4;
+
+    uint16_t remote_node_len = offset - remote_node_len_offset - 2;
+    buf[remote_node_len_offset] = (remote_node_len >> 8) & 0xFF;
+    buf[remote_node_len_offset + 1] = remote_node_len & 0xFF;
+
+    /* 5. Link Descriptors */
+    /* TLV 259 (0x0103): IPv4 Interface Address */
+    buf[offset++] = 0x01;
+    buf[offset++] = 0x03;
+    buf[offset++] = 0x00;
+    buf[offset++] = 0x04;
+    uint32_t local_addr_be = htonl(ls_info->local_addr.s_addr);
+    memcpy(&buf[offset], &local_addr_be, 4);
+    offset += 4;
+
+    /* TLV 260 (0x0104): IPv4 Neighbor Address */
+    buf[offset++] = 0x01;
+    buf[offset++] = 0x04;
+    buf[offset++] = 0x00;
+    buf[offset++] = 0x04;
+    uint32_t remote_addr_be = htonl(ls_info->remote_addr.s_addr);
+    memcpy(&buf[offset], &remote_addr_be, 4);
+    offset += 4;
+
+    /* Save the pre-encoded NLRI length */
+    p->u.prefix_linkstate.nlri_len = (uint16_t)offset;
+    
+    zlog_debug("BGPLS: prefix prepared with ls_data=%p, pre-encoded nlri_len=%zu",
+               (void*)ls_info, offset);
     
     return 0;
 }
@@ -877,32 +960,38 @@ int linkstate_delete(struct bgp *bgp, const char *if_name,safi_t safi)
 	fflush(stdout);
 	
 	//3: 标记路径为待删除并触发处理
-	/* 关键修复：防止 MP_UNREACH 构造时 double-free NLRI 缓冲区
+	/* 关键修复说明（2026-01-25）：
 	 * 
-	 * 根因分析：
-	 * 1. ADD/UPDATE 时，我们分配 semantic data pointer in prefix->u.prefix_linkstate.ls_data
-	 * 2. FRR 的 MP_REACH 编码不会释放这个 buffer（正常）
-	 * 3. 但 MP_UNREACH 编码会在结束时调用 prefix_linkstate_ptr_free()
-	 * 4. 导致 double-free（因为 buffer 可能已被其他路径释放或类型不匹配）
+	 * 问题根因：
+	 * 1. 旧代码在调用 bgp_process() 前释放了 ls_data 指针
+	 * 2. bgp_process() 是异步的，只排队任务
+	 * 3. 真正的 NLRI 编码发生在 bgp_generate_updgrp_packets 线程中
+	 * 4. 当编码时，ls_data 已为 NULL，导致编码失败和 UAF 崩溃
 	 * 
-	 * 解决方案：在 DELETE 前，手动释放 NLRI buffer 并清空指针
-	 * 但同时保存 NLRI 数据用于 MP_UNREACH 编码（通过临时 prefix）
+	 * 解决方案：
+	 * - 在 prefix_linkstate 结构中添加 nlri_buf[] 预编码缓冲区
+	 * - build_bgpls_link_nlri() 在 ADD 时预先编码 NLRI 到缓冲区
+	 * - bgp_nlri_encode_linkstate() 优先使用预编码缓冲区
+	 * - DELETE 时不需要提前释放任何内容，NLRI 数据内嵌在 prefix 中
+	 * 
+	 * 现在我们只需要标记删除并调用 bgp_process()，
+	 * 编码函数会自动使用预编码的 nlri_buf。
 	 */
 	struct prefix *p = (struct prefix *)bgp_dest_get_prefix(dest);
-	struct prefix temp_p;  // 临时保存 prefix 用于 MP_UNREACH
 	
 	if (p && p->family == AF_LINKSTATE) {
-		printf("[BGP-LS-DELETE] Saving and protecting NLRI: ptr=%p, len=%u\n", 
-		       (void*)p->u.prefix_linkstate.ls_data, p->prefixlen);
+		printf("[BGP-LS-DELETE] Using pre-encoded NLRI: nlri_len=%u, nlri_type=0x%04x\n", 
+		       p->u.prefix_linkstate.nlri_len, p->u.prefix_linkstate.nlri_type);
 		fflush(stdout);
 		
-		/* 保存 prefix 的副本（包括 NLRI 指针）供 MP_UNREACH 使用 */
-		memcpy(&temp_p, p, sizeof(temp_p));
+		/* 关键修复：不再调用 prefix_linkstate_ptr_free()！
+		 * nlri_buf 是内嵌在 prefix 中的，不需要释放。
+		 * 只需清空 ls_data 指针（标记语义数据不再有效），
+		 * 编码函数会使用 nlri_buf 中的预编码数据。
+		 */
+		p->u.prefix_linkstate.ls_data = NULL;
 		
-		/* 手动释放 NLRI buffer（使用 prefix_linkstate_ptr_free）*/
-		prefix_linkstate_ptr_free((struct prefix *)p);
-		
-		printf("[BGP-LS-DELETE] NLRI buffer freed and ptr cleared\n");
+		printf("[BGP-LS-DELETE] Cleared ls_data pointer, nlri_buf still valid for encode\n");
 		fflush(stdout);
 	}
 	

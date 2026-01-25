@@ -389,11 +389,25 @@ void prefix_copy(union prefixptr udest, union prefixconstptr usrc)
 		memcpy((void *)dest->u.prefix_flowspec.ptr,
 		       (void *)src->u.prefix_flowspec.ptr, len);
 	} else if (src->family == AF_LINKSTATE) {
-		/* For Link-State, shallow copy semantic data pointer */
+		/* For Link-State, copy semantic data pointer AND pre-encoded NLRI buffer
+		 * The nlri_buf is embedded in prefix_linkstate (not heap allocated),
+		 * so we can simply memcpy the entire structure.
+		 * This is critical for WITHDRAW support - when ls_data is cleared,
+		 * the nlri_buf still contains valid pre-encoded NLRI data.
+		 */
 		dest->u.prefix_linkstate.nlri_type =
 			src->u.prefix_linkstate.nlri_type;
 		dest->u.prefix_linkstate.ls_data =
 			src->u.prefix_linkstate.ls_data;
+		dest->u.prefix_linkstate.nlri_len =
+			src->u.prefix_linkstate.nlri_len;
+		/* Copy pre-encoded NLRI buffer if present */
+		if (src->u.prefix_linkstate.nlri_len > 0 &&
+		    src->u.prefix_linkstate.nlri_len <= LINKSTATE_NLRI_MAX_LEN) {
+			memcpy(dest->u.prefix_linkstate.nlri_buf,
+			       src->u.prefix_linkstate.nlri_buf,
+			       src->u.prefix_linkstate.nlri_len);
+		}
 	} else {
 		flog_err(EC_LIB_DEVELOPMENT,
 			 "prefix_copy(): Unknown address family %d",

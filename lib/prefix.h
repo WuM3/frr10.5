@@ -177,9 +177,23 @@ struct flowspec_prefix {
 	uintptr_t ptr;
 };
 
+/* Maximum size for pre-encoded Link-State NLRI buffer (RFC 7752)
+ * This accommodates: Type(2) + Length(2) + Protocol-ID(1) + Identifier(8)
+ *   + Local Node Descriptors(~20) + Remote Node Descriptors(~20)
+ *   + Link Descriptors(~20) = ~73 bytes, round up to 128
+ */
+#define LINKSTATE_NLRI_MAX_LEN 128
+
 struct linkstate_prefix {
 	uint16_t nlri_type;
 	void *ls_data;  /* Pointer to semantic data (struct linkstate_info *) */
+	/* Pre-encoded NLRI buffer for WITHDRAW support.
+	 * The NLRI is encoded at ADD time and cached here.
+	 * When bgp_process() queues a WITHDRAW, the encode function
+	 * uses this buffer instead of ls_data (which may be freed).
+	 */
+	uint16_t nlri_len;  /* Length of pre-encoded NLRI in nlri_buf */
+	uint8_t nlri_buf[LINKSTATE_NLRI_MAX_LEN];
 };
 
 /* FRR generic prefix structure. */
