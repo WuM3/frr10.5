@@ -1028,6 +1028,7 @@ struct bgp {
 	struct hash *linkstate_if_map;      /* Interface name to prefix mapping (for O(1) delete) */
 	struct hash *linkstate_cache;       /* Interface state cache for change detection */
 	struct list *linkstate_if_list;     /* List of monitored interface names */
+	struct hash *nodestate_map;         /* Node name to prefix mapping (for O(1) delete) */
 
 	/* BGP Time-Variant Routing (TVR) state */
 	struct tvr_routing_state *tvr_state;/* TVR scheduler and timer state */

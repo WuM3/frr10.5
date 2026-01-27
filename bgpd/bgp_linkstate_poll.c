@@ -338,18 +338,257 @@ static int parse_link_json_object(struct json_object *link_obj,
 }
 
 /**
+ * 解析单个节点的JSON对象
+ * 
+ * JSON格式示例:
+ * {
+ *   "node_name": "router1.example.com",
+ *   "descriptors": {
+ *     "asn": 65001,
+ *     "bgpls_id": 0,
+ *     "ospf_area_id": 0,
+ *     "router_id": "192.168.1.1",
+ *     "protocol_id": 5,
+ *     "identifier": 0
+ *   },
+ *   "attributes": {
+ *     "node_flags": 0,
+ *     "te_router_id": "192.168.1.1",
+ *     "sr_capabilities": {
+ *       "flags": 192,
+ *       "srgb_base": 16000,
+ *       "srgb_range": 8000
+ *     },
+ *     "sr_algorithms": [0, 1],
+ *     "srlb": {
+ *       "base": 15000,
+ *       "range": 1000
+ *     },
+ *     "oper_status": 1
+ *   }
+ * }
+ * 
+ * @param node_obj JSON节点对象
+ * @param ns_info 输出的节点状态信息
+ * @return 0 成功, -1 失败
+ */
+static int parse_node_json_object(struct json_object *node_obj,
+                                   struct nodestate_info *ns_info)
+{
+	struct json_object *nlri_obj, *desc_obj, *attr_obj, *val;
+	
+	if (!node_obj || !ns_info)
+		return -1;
+	
+	memset(ns_info, 0, sizeof(*ns_info));
+	
+	/* 默认oper_status为UP，除非显式设置为0 */
+	ns_info->oper_status = 1;
+	
+	/* 读取节点名称（必需字段）*/
+	struct json_object *node_name_obj;
+	if (json_object_object_get_ex(node_obj, "node_name", &node_name_obj)) {
+		snprintf(ns_info->node_name, sizeof(ns_info->node_name), "%s",
+		         json_object_get_string(node_name_obj));
+	} else {
+		zlog_err("%s: Missing 'node_name' in node object", __func__);
+		return -1;
+	}
+	
+	/* 读取NLRI字段（支持新格式：nlri.local_node_descriptors）*/
+	if (json_object_object_get_ex(node_obj, "nlri", &nlri_obj)) {
+		/* Protocol ID (在nlri层级) */
+		if (json_object_object_get_ex(nlri_obj, "protocol_id", &val))
+			ns_info->protocol_id = json_object_get_int(val);
+		
+		/* Instance Identifier (在nlri层级) */
+		if (json_object_object_get_ex(nlri_obj, "identifier", &val))
+			ns_info->identifier = json_object_get_int64(val);
+		
+		/* Local Node Descriptors (新格式) */
+		if (json_object_object_get_ex(nlri_obj, "local_node_descriptors", &desc_obj)) {
+			/* Autonomous System Number (Sub-TLV 512) */
+			if (json_object_object_get_ex(desc_obj, "asn", &val))
+				ns_info->asn = json_object_get_int(val);
+			
+			/* BGP-LS Identifier (Sub-TLV 513) */
+			if (json_object_object_get_ex(desc_obj, "bgpls_id", &val))
+				ns_info->bgpls_id = json_object_get_int(val);
+			
+			/* OSPF Area-ID (Sub-TLV 514) */
+			if (json_object_object_get_ex(desc_obj, "ospf_area_id", &val))
+				ns_info->ospf_area_id = json_object_get_int(val);
+			
+			/* IGP Router-ID (Sub-TLV 515) */
+			if (json_object_object_get_ex(desc_obj, "router_id", &val)) {
+				inet_pton(AF_INET, json_object_get_string(val),
+				          &ns_info->router_id);
+			}
+			
+			/* IS-IS ISO System-ID (hex string, e.g., "0102.0304.0506") */
+			if (json_object_object_get_ex(desc_obj, "iso_node_id", &val)) {
+				const char *iso_str = json_object_get_string(val);
+				/* 简化解析：假设格式为 "XXXX.XXXX.XXXX" */
+				if (iso_str && strlen(iso_str) >= 14) {
+					uint8_t *id = ns_info->iso_node_id;
+					sscanf(iso_str, "%2hhx%2hhx.%2hhx%2hhx.%2hhx%2hhx",
+					       &id[0], &id[1], &id[2], &id[3], &id[4], &id[5]);
+					ns_info->iso_node_id_len = 6;
+				}
+			}
+		}
+	}
+	/* 兼容旧格式：直接在node_obj下的descriptors字段 */
+	else if (json_object_object_get_ex(node_obj, "descriptors", &desc_obj)) {
+		/* Autonomous System Number (Sub-TLV 512) */
+		if (json_object_object_get_ex(desc_obj, "asn", &val))
+			ns_info->asn = json_object_get_int(val);
+		
+		/* BGP-LS Identifier (Sub-TLV 513) */
+		if (json_object_object_get_ex(desc_obj, "bgpls_id", &val))
+			ns_info->bgpls_id = json_object_get_int(val);
+		
+		/* OSPF Area-ID (Sub-TLV 514) */
+		if (json_object_object_get_ex(desc_obj, "ospf_area_id", &val))
+			ns_info->ospf_area_id = json_object_get_int(val);
+		
+		/* IGP Router-ID (Sub-TLV 515) */
+		if (json_object_object_get_ex(desc_obj, "router_id", &val)) {
+			inet_pton(AF_INET, json_object_get_string(val),
+			          &ns_info->router_id);
+		}
+		
+		/* Protocol ID */
+		if (json_object_object_get_ex(desc_obj, "protocol_id", &val))
+			ns_info->protocol_id = json_object_get_int(val);
+		
+		/* Instance Identifier */
+		if (json_object_object_get_ex(desc_obj, "identifier", &val))
+			ns_info->identifier = json_object_get_int64(val);
+		
+		/* IS-IS ISO System-ID (hex string, e.g., "0102.0304.0506") */
+		if (json_object_object_get_ex(desc_obj, "iso_node_id", &val)) {
+			const char *iso_str = json_object_get_string(val);
+			/* 简化解析：假设格式为 "XXXX.XXXX.XXXX" */
+			if (iso_str && strlen(iso_str) >= 14) {
+				uint8_t *id = ns_info->iso_node_id;
+				sscanf(iso_str, "%2hhx%2hhx.%2hhx%2hhx.%2hhx%2hhx",
+				       &id[0], &id[1], &id[2], &id[3], &id[4], &id[5]);
+				ns_info->iso_node_id_len = 6;
+			}
+		}
+	}
+	
+	/* 读取Node Attributes字段 */
+	if (json_object_object_get_ex(node_obj, "attributes", &attr_obj)) {
+		/* Node Flag Bits (TLV 1024) */
+		if (json_object_object_get_ex(attr_obj, "node_flags", &val))
+			ns_info->node_flags = json_object_get_int(val);
+		
+		/* IPv4 TE Router-ID (TLV 1028) */
+		if (json_object_object_get_ex(attr_obj, "te_router_id", &val)) {
+			inet_pton(AF_INET, json_object_get_string(val),
+			          &ns_info->te_router_id);
+		}
+		
+		/* IPv6 TE Router-ID (TLV 1029) */
+		if (json_object_object_get_ex(attr_obj, "te_router_id_v6", &val)) {
+			inet_pton(AF_INET6, json_object_get_string(val),
+			          &ns_info->te_router_id_v6);
+		}
+		
+		/* IS-IS Area Identifier (TLV 1027) */
+		if (json_object_object_get_ex(attr_obj, "isis_area_id", &val)) {
+			const char *area_str = json_object_get_string(val);
+			if (area_str) {
+				/* 简化解析：假设格式为 "49.0001" 等 */
+				size_t len = strlen(area_str);
+				if (len > 0 && len <= 13) {
+					/* 直接作为字符串存储（实际应解析为字节）*/
+					memcpy(ns_info->isis_area_id, area_str, len);
+					ns_info->isis_area_id_len = len;
+				}
+			}
+		}
+		
+		/* SR Capabilities (RFC 9085 TLV 1034) */
+		struct json_object *sr_cap_obj;
+		if (json_object_object_get_ex(attr_obj, "sr_capabilities", &sr_cap_obj)) {
+			if (json_object_object_get_ex(sr_cap_obj, "flags", &val))
+				ns_info->sr_capability_flags = json_object_get_int(val);
+			if (json_object_object_get_ex(sr_cap_obj, "srgb_base", &val))
+				ns_info->srgb_base = json_object_get_int(val);
+			if (json_object_object_get_ex(sr_cap_obj, "srgb_range", &val))
+				ns_info->srgb_range = json_object_get_int(val);
+		}
+		
+		/* SR Algorithms (RFC 9085 TLV 1035) */
+		struct json_object *sr_algo_array;
+		if (json_object_object_get_ex(attr_obj, "sr_algorithms", &sr_algo_array)) {
+			int algo_len = json_object_array_length(sr_algo_array);
+			if (algo_len > 8) algo_len = 8;
+			for (int j = 0; j < algo_len; j++) {
+				struct json_object *algo_obj = json_object_array_get_idx(sr_algo_array, j);
+				ns_info->sr_algorithms[j] = json_object_get_int(algo_obj);
+			}
+			ns_info->sr_algorithm_count = algo_len;
+		}
+		
+		/* SR Local Block (RFC 9085 TLV 1036) - 支持两种格式 */
+		struct json_object *srlb_obj;
+		/* 新格式: sr_local_block: {srlb_base, srlb_range} */
+		if (json_object_object_get_ex(attr_obj, "sr_local_block", &srlb_obj)) {
+			if (json_object_object_get_ex(srlb_obj, "srlb_base", &val))
+				ns_info->srlb_base = json_object_get_int(val);
+			if (json_object_object_get_ex(srlb_obj, "srlb_range", &val))
+				ns_info->srlb_range = json_object_get_int(val);
+		}
+		/* 旧格式: srlb: {base, range} */
+		else if (json_object_object_get_ex(attr_obj, "srlb", &srlb_obj)) {
+			if (json_object_object_get_ex(srlb_obj, "base", &val))
+				ns_info->srlb_base = json_object_get_int(val);
+			if (json_object_object_get_ex(srlb_obj, "range", &val))
+				ns_info->srlb_range = json_object_get_int(val);
+		}
+		
+		/* SRMS Preference (RFC 9085 TLV 1037) */
+		if (json_object_object_get_ex(attr_obj, "srms_preference", &val))
+			ns_info->srms_preference = json_object_get_int(val);
+		
+		/* 操作状态 (类似link的oper_status) */
+		if (json_object_object_get_ex(attr_obj, "oper_status", &val))
+			ns_info->oper_status = json_object_get_int(val);
+	}
+	
+	ns_info->last_update = time(NULL);
+	
+	printf("[BGP-LS-UDP] Parsed node: name=%s, router_id=%s, asn=%u\n",
+	       ns_info->node_name, inet_ntoa(ns_info->router_id), ns_info->asn);
+	fflush(stdout);
+	
+	return 0;
+}
+
+/**
  * 处理UDP接收到的JSON数据
+ * 
+ * 支持的格式:
+ * 1. {"links": [...]} - 批量链路数组
+ * 2. {"nodes": [...]} - 批量节点数组
+ * 3. {"links": [...], "nodes": [...]} - 混合模式
+ * 4. {"if_name": "...", ...} - 单个链路对象
+ * 5. {"node_name": "...", ...} - 单个节点对象
  * 
  * @param bgp BGP实例
  * @param json_data JSON数据字符串
  * @param data_len 数据长度
- * @return 处理的链路数量，失败返回-1
+ * @return 处理的对象数量，失败返回-1
  */
 static int process_udp_linkstate_data(struct bgp *bgp, const char *json_data, size_t data_len)
 {
-	struct json_object *root, *links_array, *link_obj;
-	int count = 0;
-	int processed = 0;
+	struct json_object *root, *links_array, *nodes_array, *link_obj, *node_obj;
+	int link_count = 0, node_count = 0;
+	int link_processed = 0, node_processed = 0;
 	
 	if (!bgp || !json_data || data_len == 0) {
 		zlog_err("%s: Invalid parameters", __func__);
@@ -363,16 +602,15 @@ static int process_udp_linkstate_data(struct bgp *bgp, const char *json_data, si
 		return -1;
 	}
 	
-	/* 支持两种格式：
-	 * 1. {"links": [...]} - 批量链路数组
-	 * 2. {"if_name": "...", ...} - 单个链路对象
-	 */
+	/* ================================================================
+	 * 处理Links数组
+	 * ================================================================ */
 	if (json_object_object_get_ex(root, "links", &links_array)) {
-		/* 批量链路格式 */
 		int array_len = json_object_array_length(links_array);
 		
-		zlog_info("%s: Processing batch of %d links from UDP",
-		          __func__, array_len);
+		zlog_info("%s: Processing batch of %d links from UDP", __func__, array_len);
+		printf("[BGP-LS-UDP] Processing %d links\n", array_len);
+		fflush(stdout);
 		
 		for (int i = 0; i < array_len; i++) {
 			link_obj = json_object_array_get_idx(links_array, i);
@@ -385,66 +623,142 @@ static int process_udp_linkstate_data(struct bgp *bgp, const char *json_data, si
 				continue;
 			}
 			
-			count++;
+			link_count++;
 			int ret = 0;
 			
-			/* 根据 oper_status 判断操作类型 */
 			if (ls_info.oper_status == 0) {
-				/* 链路 DOWN，删除该链路状态 */
 				printf("[BGP-LS-UDP] Link %s is DOWN, calling linkstate_delete\n",
 				       ls_info.if_name);
 				fflush(stdout);
-				
 				ret = linkstate_delete(bgp, ls_info.if_name, SAFI_LINKSTATE);
 			} else {
-				/* 链路 UP，调用 update */
 				printf("[BGP-LS-UDP] Link %s is UP (oper_status=%d), calling linkstate_update\n",
 				       ls_info.if_name, ls_info.oper_status);
 				fflush(stdout);
-				
 				ret = linkstate_update(bgp, &ls_info, SAFI_LINKSTATE);
 			}
 			
 			if (ret == 0)
-				processed++;
+				link_processed++;
 		}
-	} else if (json_object_object_get_ex(root, "if_name", NULL)) {
-		/* 单个链路格式 */
-		struct linkstate_info ls_info;
+	}
+	
+	/* ================================================================
+	 * 处理Nodes数组
+	 * ================================================================ */
+	if (json_object_object_get_ex(root, "nodes", &nodes_array)) {
+		int array_len = json_object_array_length(nodes_array);
 		
-		if (parse_link_json_object(root, &ls_info) == 0) {
-			count = 1;
+		zlog_info("%s: Processing batch of %d nodes from UDP", __func__, array_len);
+		printf("[BGP-LS-UDP] Processing %d nodes\n", array_len);
+		fflush(stdout);
+		
+		for (int i = 0; i < array_len; i++) {
+			node_obj = json_object_array_get_idx(nodes_array, i);
+			if (!node_obj)
+				continue;
+			
+			struct nodestate_info ns_info;
+			if (parse_node_json_object(node_obj, &ns_info) != 0) {
+				zlog_warn("%s: Failed to parse node object %d", __func__, i);
+				continue;
+			}
+			
+			node_count++;
 			int ret = 0;
 			
-			if (ls_info.oper_status == 0) {
-				printf("[BGP-LS-UDP] Link %s is DOWN, calling linkstate_delete\n",
-				       ls_info.if_name);
+			if (ns_info.oper_status == 0) {
+				printf("[BGP-LS-UDP] Node %s is DOWN, calling nodestate_delete\n",
+				       ns_info.node_name);
 				fflush(stdout);
-				
-				ret = linkstate_delete(bgp, ls_info.if_name, SAFI_LINKSTATE);
+				ret = nodestate_delete(bgp, ns_info.node_name, SAFI_LINKSTATE);
 			} else {
-				printf("[BGP-LS-UDP] Link %s is UP (oper_status=%d), calling linkstate_update\n",
-				       ls_info.if_name, ls_info.oper_status);
+				printf("[BGP-LS-UDP] Node %s is UP (oper_status=%d), calling nodestate_update\n",
+				       ns_info.node_name, ns_info.oper_status);
 				fflush(stdout);
-				
-				ret = linkstate_update(bgp, &ls_info, SAFI_LINKSTATE);
+				ret = nodestate_update(bgp, &ns_info, SAFI_LINKSTATE);
 			}
 			
 			if (ret == 0)
-				processed++;
+				node_processed++;
 		}
-	} else {
-		zlog_err("%s: Unknown JSON format - expected 'links' array or single link object",
-		         __func__);
-		json_object_put(root);
-		return -1;
+	}
+	
+	/* ================================================================
+	 * 处理单个对象（向后兼容）
+	 * ================================================================ */
+	if (link_count == 0 && node_count == 0) {
+		/* 检查是否是单个link对象 */
+		if (json_object_object_get_ex(root, "if_name", NULL)) {
+			struct linkstate_info ls_info;
+			
+			if (parse_link_json_object(root, &ls_info) == 0) {
+				link_count = 1;
+				int ret = 0;
+				
+				if (ls_info.oper_status == 0) {
+					printf("[BGP-LS-UDP] Link %s is DOWN, calling linkstate_delete\n",
+					       ls_info.if_name);
+					fflush(stdout);
+					ret = linkstate_delete(bgp, ls_info.if_name, SAFI_LINKSTATE);
+				} else {
+					printf("[BGP-LS-UDP] Link %s is UP (oper_status=%d), calling linkstate_update\n",
+					       ls_info.if_name, ls_info.oper_status);
+					fflush(stdout);
+					ret = linkstate_update(bgp, &ls_info, SAFI_LINKSTATE);
+				}
+				
+				if (ret == 0)
+					link_processed++;
+			}
+		}
+		/* 检查是否是单个node对象 */
+		else if (json_object_object_get_ex(root, "node_name", NULL)) {
+			struct nodestate_info ns_info;
+			
+			if (parse_node_json_object(root, &ns_info) == 0) {
+				node_count = 1;
+				int ret = 0;
+				
+				if (ns_info.oper_status == 0) {
+					printf("[BGP-LS-UDP] Node %s is DOWN, calling nodestate_delete\n",
+					       ns_info.node_name);
+					fflush(stdout);
+					ret = nodestate_delete(bgp, ns_info.node_name, SAFI_LINKSTATE);
+				} else {
+					printf("[BGP-LS-UDP] Node %s is UP (oper_status=%d), calling nodestate_update\n",
+					       ns_info.node_name, ns_info.oper_status);
+					fflush(stdout);
+					ret = nodestate_update(bgp, &ns_info, SAFI_LINKSTATE);
+				}
+				
+				if (ret == 0)
+					node_processed++;
+			}
+		}
+		else {
+			zlog_err("%s: Unknown JSON format - expected 'links', 'nodes', 'if_name', or 'node_name'",
+			         __func__);
+			json_object_put(root);
+			return -1;
+		}
 	}
 	
 	json_object_put(root);
 	
-	zlog_info("%s: Processed %d/%d links from UDP message",
-	          __func__, processed, count);
-	return processed;
+	int total_count = link_count + node_count;
+	int total_processed = link_processed + node_processed;
+	
+	zlog_info("%s: Processed %d/%d objects (links: %d/%d, nodes: %d/%d)",
+	          __func__, total_processed, total_count,
+	          link_processed, link_count, node_processed, node_count);
+	
+	printf("[BGP-LS-UDP] Total processed: %d/%d (links: %d/%d, nodes: %d/%d)\n",
+	       total_processed, total_count,
+	       link_processed, link_count, node_processed, node_count);
+	fflush(stdout);
+	
+	return total_processed;
 }
 
 /**
