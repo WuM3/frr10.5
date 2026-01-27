@@ -48,6 +48,10 @@ extern void bgp_linkstate_poll_start(struct bgp *bgp);
 extern void bgp_linkstate_poll_stop(struct bgp *bgp);
 extern void bgp_linkstate_set_poll_interval(struct bgp *bgp, uint32_t interval);
 
+/* UDP服务器函数 */
+extern int bgp_linkstate_udp_server_start(struct bgp *bgp, uint16_t port);
+extern void bgp_linkstate_udp_server_stop(void);
+
 /* 哈希表管理函数 */
 extern void bgp_linkstate_if_map_init(struct bgp *bgp);
 extern void bgp_linkstate_if_map_finish(struct bgp *bgp);

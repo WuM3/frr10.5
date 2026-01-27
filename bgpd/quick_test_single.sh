@@ -747,40 +747,7 @@ fi
 echo ""
 
 # ============= 阶段4: 恢复 oper_status=1 触发 RE-ADD (T+120s) =============
-echo -e
-
-# 检查阶段4的RIB状态（验证RE-ADD是否生效）
-echo -e "${BLUE}[检查点4] 验证Router1的RIB状态（重新添加后）...${NC}"
-if [ "$VTYSH_AVAILABLE" = "yes" ]; then
-    R1_RIB_STAGE4=$(ip netns exec router1 "$VTYSH_BIN" -N router1 -c "show bgp ipv4 linkstate" 2>/dev/null)
-    ROUTE_COUNT_STAGE4=$(echo "$R1_RIB_STAGE4" | grep -c "192.168.1" || echo "0")
-    echo "Router1 RIB路由数: $ROUTE_COUNT_STAGE4"
-    echo "$R1_RIB_STAGE4" | head -20
-    
-    if [ "$ROUTE_COUNT_STAGE4" -gt 0 ]; then
-        echo -e "${GREEN}✓ 阶段4: RIB中有 $ROUTE_COUNT_STAGE4 条Link-State路由（RE-ADD成功）${NC}"
-    else
-        echo -e "${RED}✗ 阶段4: RIB仍为空（RE-ADD失败）${NC}"
-    fi
-else
-    echo -e "${YELLOW}⚠ vtysh不可用，跳过RIB检查${NC}"
-fi
-
-echo ""
-echo -e "${BLUE}[检查点4] 验证Router2的RIB状态（重新添加后）...${NC}"
-if [ "$VTYSH_AVAILABLE" = "yes" ]; then
-    R2_RIB_STAGE4=$(ip netns exec router2 "$VTYSH_BIN" -N router2 -c "show bgp ipv4 linkstate" 2>/dev/null)
-    R2_ROUTE_COUNT_STAGE4=$(echo "$R2_RIB_STAGE4" | grep -c "192.168.1" || echo "0")
-    echo "Router2 RIB路由数: $R2_ROUTE_COUNT_STAGE4"
-    echo "$R2_RIB_STAGE4" | head -20
-    
-    if [ "$R2_ROUTE_COUNT_STAGE4" -gt 0 ]; then
-        echo -e "${GREEN}✓ 阶段4: Router2收到 $R2_ROUTE_COUNT_STAGE4 条Link-State路由${NC}"
-    else
-        echo -e "${RED}✗ 阶段4: Router2的RIB为空（未收到RE-ADD）${NC}"
-    fi
-fi
-echo "" "${GREEN}[阶段4] 生成新配置文件，恢复链路以触发 RE-ADD...${NC}"
+echo -e "${GREEN}[阶段4] 生成新配置文件，恢复链路以触发 RE-ADD...${NC}"
 
 TIMESTAMP_STAGE4=$(date +"%Y%m%d_%H%M%S")
 cat > /etc/frr/linkstate/linkstate_${TIMESTAMP_STAGE4}.json <<'EOF_STAGE4'
@@ -800,7 +767,71 @@ cat > /etc/frr/linkstate/linkstate_${TIMESTAMP_STAGE4}.json <<'EOF_STAGE4'
         "remote_node": {
           "router_id": "2.2.2.2"
         },
-       
+        "link_descriptors": {
+          "local_ipv4": "192.168.1.1",
+          "remote_ipv4": "192.168.1.2"
+        }
+      },
+      "attributes": {
+        "oper_status": 1,
+        "max_bandwidth": 5000000000,
+        "te_metric": 15,
+        "igp_metric": 15,
+        "admin_group": 0,
+        "unreserved_bw": [5000000000, 5000000000, 5000000000, 5000000000, 5000000000, 5000000000, 5000000000, 5000000000],
+        "spf_sequence_number": 103,
+        "spf_status": 0
+      }
+    }
+  ]
+}
+EOF_STAGE4
+sed -i "s/TIMESTAMP_PLACEHOLDER/$(date -Iseconds)/" /etc/frr/linkstate/linkstate_${TIMESTAMP_STAGE4}.json
+
+echo "  新配置: oper_status=1 (链路up), max_bandwidth=5Gbps, metric=15"
+echo "  等待下一次轮询 (30秒)..."
+for i in {30..1}; do
+    echo -ne "\r  剩余 $i 秒...     "
+    sleep 1
+done
+echo -e "\n${GREEN}✓ 阶段4轮询完成${NC}"
+echo ""
+
+# 检查阶段4的RIB状态（验证RE-ADD是否生效）
+echo -e "${BLUE}[检查点4] 验证Router1的RIB状态（重新添加后）...${NC}"
+if [ "$VTYSH_AVAILABLE" = "yes" ]; then
+    R1_RIB_STAGE4=$(ip netns exec router1 "$VTYSH_BIN" -N router1 -c "show bgp ipv4 linkstate" 2>/dev/null)
+    ROUTE_COUNT_STAGE4=$(echo "$R1_RIB_STAGE4" | grep -c "192.168.1" || echo "0")
+    echo "Router1 RIB路由数: $ROUTE_COUNT_STAGE4"
+    echo "$R1_RIB_STAGE4" | head -20
+    
+    if [ "$ROUTE_COUNT_STAGE4" -gt 0 ]; then
+        echo -e "${GREEN}✓ 阶段4: RIB中有 $ROUTE_COUNT_STAGE4 条Link-State路由（RE-ADD成功）${NC}"
+    else
+        echo -e "${RED}✗ 阶段4: RIB仍为空（RE-ADD失败）${NC}"
+    fi
+else
+    echo -e "${YELLOW}⚠ vtysh不可用，跳过RIB检查${NC}"
+    ROUTE_COUNT_STAGE4=0
+fi
+
+echo ""
+echo -e "${BLUE}[检查点4] 验证Router2的RIB状态（重新添加后）...${NC}"
+if [ "$VTYSH_AVAILABLE" = "yes" ]; then
+    R2_RIB_STAGE4=$(ip netns exec router2 "$VTYSH_BIN" -N router2 -c "show bgp ipv4 linkstate" 2>/dev/null)
+    R2_ROUTE_COUNT_STAGE4=$(echo "$R2_RIB_STAGE4" | grep -c "192.168.1" || echo "0")
+    echo "Router2 RIB路由数: $R2_ROUTE_COUNT_STAGE4"
+    echo "$R2_RIB_STAGE4" | head -20
+    
+    if [ "$R2_ROUTE_COUNT_STAGE4" -gt 0 ]; then
+        echo -e "${GREEN}✓ 阶段4: Router2收到 $R2_ROUTE_COUNT_STAGE4 条Link-State路由${NC}"
+    else
+        echo -e "${RED}✗ 阶段4: Router2的RIB为空（未收到RE-ADD）${NC}"
+    fi
+else
+    R2_ROUTE_COUNT_STAGE4=0
+fi
+echo ""
 
 # 生成阶段测试总结
 echo -e "${BLUE}各阶段RIB变化总结:${NC}"
@@ -853,34 +884,6 @@ if [ "$VTYSH_AVAILABLE" = "yes" ]; then
 else
     echo "vtysh不可用，无法生成RIB总结"
 fi
-echo "" "link_descriptors": {
-          "local_ipv4": "192.168.1.1",
-          "remote_ipv4": "192.168.1.2"
-        }
-      },
-      "attributes": {
-        "oper_status": 1,
-        "max_bandwidth": 5000000000,
-        "te_metric": 15,
-        "igp_metric": 15,
-        "admin_group": 0,
-        "unreserved_bw": [5000000000, 5000000000, 5000000000, 5000000000, 5000000000, 5000000000, 5000000000, 5000000000],
-        "spf_sequence_number": 103,
-        "spf_status": 0
-      }
-    }
-  ]
-}
-EOF_STAGE4
-sed -i "s/TIMESTAMP_PLACEHOLDER/$(date -Iseconds)/" /etc/frr/linkstate/linkstate_${TIMESTAMP_STAGE4}.json
-
-echo "  新配置: oper_status=1 (链路up), max_bandwidth=5Gbps"
-echo "  等待下一次轮询 (30秒)..."
-for i in {30..1}; do
-    echo -ne "\r  剩余 $i 秒...     "
-    sleep 1
-done
-echo -e "\n${GREEN}✓ 阶段4完成: RE-ADD应已发送（链路恢复）${NC}"
 echo ""
 
 echo -e "${GREEN}=========================================="
