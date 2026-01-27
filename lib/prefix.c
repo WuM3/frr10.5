@@ -254,9 +254,16 @@ int prefix_match(union prefixconstptr unet, union prefixconstptr upfx)
 		    p->u.prefix_linkstate.nlri_type)
 			return 0;
 
-		/* For Link-State, compare semantic data pointers */
-		return (n->u.prefix_linkstate.ls_data ==
-			p->u.prefix_linkstate.ls_data);
+		/* For Link-State, compare pre-encoded NLRI buffer content
+		 * instead of unstable ls_data pointer */
+		if (n->u.prefix_linkstate.nlri_len !=
+		    p->u.prefix_linkstate.nlri_len)
+			return 0;
+		if (n->u.prefix_linkstate.nlri_len == 0)
+			return 1; /* Both empty, considered equal */
+		return (memcmp(n->u.prefix_linkstate.nlri_buf,
+		               p->u.prefix_linkstate.nlri_buf,
+		               n->u.prefix_linkstate.nlri_len) == 0);
 	}
 
 	/* Set both prefix's head pointer. */
@@ -389,11 +396,25 @@ void prefix_copy(union prefixptr udest, union prefixconstptr usrc)
 		memcpy((void *)dest->u.prefix_flowspec.ptr,
 		       (void *)src->u.prefix_flowspec.ptr, len);
 	} else if (src->family == AF_LINKSTATE) {
-		/* For Link-State, shallow copy semantic data pointer */
+		/* For Link-State, copy semantic data pointer AND pre-encoded NLRI buffer
+		 * The nlri_buf is embedded in prefix_linkstate (not heap allocated),
+		 * so we can simply memcpy the entire structure.
+		 * This is critical for WITHDRAW support - when ls_data is cleared,
+		 * the nlri_buf still contains valid pre-encoded NLRI data.
+		 */
 		dest->u.prefix_linkstate.nlri_type =
 			src->u.prefix_linkstate.nlri_type;
 		dest->u.prefix_linkstate.ls_data =
 			src->u.prefix_linkstate.ls_data;
+		dest->u.prefix_linkstate.nlri_len =
+			src->u.prefix_linkstate.nlri_len;
+		/* Copy pre-encoded NLRI buffer if present */
+		if (src->u.prefix_linkstate.nlri_len > 0 &&
+		    src->u.prefix_linkstate.nlri_len <= LINKSTATE_NLRI_MAX_LEN) {
+			memcpy(dest->u.prefix_linkstate.nlri_buf,
+			       src->u.prefix_linkstate.nlri_buf,
+			       src->u.prefix_linkstate.nlri_len);
+		}
 	} else {
 		flog_err(EC_LIB_DEVELOPMENT,
 			 "prefix_copy(): Unknown address family %d",
@@ -487,9 +508,14 @@ int prefix_same(union prefixconstptr up1, union prefixconstptr up2)
 			if (p1->u.prefix_linkstate.nlri_type !=
 			    p2->u.prefix_linkstate.nlri_type)
 				return 0;
-			if (p1->u.prefix_linkstate.ls_data ==
-			    p2->u.prefix_linkstate.ls_data)
+			if (p1->u.prefix_linkstate.nlri_len !=
+			    p2->u.prefix_linkstate.nlri_len)
+				return 0;
+			if (p1->u.prefix_linkstate.nlri_len == 0)
 				return 1;
+			return (memcmp(p1->u.prefix_linkstate.nlri_buf,
+			               p2->u.prefix_linkstate.nlri_buf,
+			               p1->u.prefix_linkstate.nlri_len) == 0);
 		}
 	}
 	return 0;
@@ -539,17 +565,22 @@ int prefix_cmp(union prefixconstptr up1, union prefixconstptr up2)
 				return numcmp(pp1[offset], pp2[offset]);
 		return 0;
 	} else if (p1->family == AF_LINKSTATE) {
-		/* For Link-State, compare semantic data pointers as addresses */
+		/* For Link-State, compare pre-encoded NLRI buffer content */
 		if (p1->u.prefix_linkstate.nlri_type !=
 		    p2->u.prefix_linkstate.nlri_type)
 			return numcmp(p1->u.prefix_linkstate.nlri_type,
 				      p2->u.prefix_linkstate.nlri_type);
 
-		if (p1->u.prefix_linkstate.ls_data < p2->u.prefix_linkstate.ls_data)
-			return -1;
-		if (p1->u.prefix_linkstate.ls_data > p2->u.prefix_linkstate.ls_data)
-			return 1;
-		return 0;
+		if (p1->u.prefix_linkstate.nlri_len !=
+		    p2->u.prefix_linkstate.nlri_len)
+			return numcmp(p1->u.prefix_linkstate.nlri_len,
+				      p2->u.prefix_linkstate.nlri_len);
+
+		if (p1->u.prefix_linkstate.nlri_len == 0)
+			return 0;
+		return memcmp(p1->u.prefix_linkstate.nlri_buf,
+		              p2->u.prefix_linkstate.nlri_buf,
+		              p1->u.prefix_linkstate.nlri_len);
 	}
 	pp1 = p1->u.val;
 	pp2 = p2->u.val;
@@ -1520,11 +1551,14 @@ unsigned prefix_hash_key(const void *pp)
 		prefix_flowspec_ptr_free(&copy);
 		return len;
 	} else if (((struct prefix *)pp)->family == AF_LINKSTATE) {
-		/* Hash the pointer value itself for Link-State */
-		len = jhash(&copy.u.prefix_linkstate.ls_data,
-			    sizeof(copy.u.prefix_linkstate.ls_data),
-			    0x55aa5a5a);
-		return len;
+		/* Hash the pre-encoded NLRI buffer content for Link-State */
+		uint32_t hash = 0x55aa5a5a;
+		hash = jhash(&copy.u.prefix_linkstate.nlri_type,
+			     sizeof(copy.u.prefix_linkstate.nlri_type), hash);
+		if (copy.u.prefix_linkstate.nlri_len > 0)
+			hash = jhash(copy.u.prefix_linkstate.nlri_buf,
+				     copy.u.prefix_linkstate.nlri_len, hash);
+		return hash;
 	}
 
 	return jhash(&copy,

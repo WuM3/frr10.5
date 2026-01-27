@@ -177,9 +177,26 @@ struct flowspec_prefix {
 	uintptr_t ptr;
 };
 
+/* Maximum size for pre-encoded Link-State NLRI buffer (RFC 7752)
+ * This accommodates: Type(2) + Length(2) + Protocol-ID(1) + Identifier(8)
+ *   + Local Node Descriptors(~20) + Remote Node Descriptors(~20)
+ *   + Link Descriptors(~20) = ~73 bytes, round up to 128
+ */
+#define LINKSTATE_NLRI_MAX_LEN 128
+
+/* Link-State prefix structure for BGP-LS (RFC 7752)
+ * 
+ * CRITICAL: nlri_buf MUST be the first field!
+ * FRR's route_node_get() uses &p->u.prefix for radix tree traversal.
+ * Since all union members share the same starting address, placing
+ * nlri_buf first ensures prefix_bit() reads the correct NLRI bytes.
+ */
 struct linkstate_prefix {
-	uint16_t nlri_type;
-	void *ls_data;  /* Pointer to semantic data (struct linkstate_info *) */
+	/* Pre-encoded NLRI buffer - MUST be first for radix tree compatibility */
+	uint8_t nlri_buf[LINKSTATE_NLRI_MAX_LEN];
+	uint16_t nlri_len;  /* Length of pre-encoded NLRI in nlri_buf */
+	uint16_t nlri_type; /* NLRI type: 1=Node, 2=Link, 3=IPv4 Prefix, 4=IPv6 Prefix */
+	void *ls_data;  /* Pointer to semantic data (struct linkstate_info *) - optional */
 };
 
 /* FRR generic prefix structure. */

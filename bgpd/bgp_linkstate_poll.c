@@ -28,6 +28,10 @@
 #include <json-c/json.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 
 /* 临时禁用本文件的日志，避免 NSS 相关崩溃 */
 /* 使用 printf 替代关键日志点，避免NSS调用 */
@@ -209,6 +213,402 @@ static int read_interface_linkstate(const char *if_name, struct linkstate_info *
 	ls_info->last_update = time(NULL);
 
 	return 0;
+}
+
+/* ========================================================================
+ * UDP Socket Server for Link-State Updates
+ * ======================================================================== */
+
+/* UDP服务器默认端口 */
+#define LINKSTATE_UDP_PORT 9999
+#define LINKSTATE_UDP_BUF_SIZE 65536
+
+/* UDP服务器状态 */
+static int udp_server_fd = -1;
+static struct event *udp_server_event = NULL;
+
+/**
+ * 解析单个链路的JSON对象（复用read_linkstate_from_config的逻辑）
+ * 
+ * @param link_obj JSON链路对象
+ * @param ls_info 输出的链路状态信息
+ * @return 0 成功, -1 失败
+ */
+static int parse_link_json_object(struct json_object *link_obj,
+                                   struct linkstate_info *ls_info)
+{
+	struct json_object *nlri_obj, *attr_obj;
+	struct json_object *local_node, *remote_node, *link_desc, *unreserved_bw_array;
+	
+	if (!link_obj || !ls_info)
+		return -1;
+	
+	memset(ls_info, 0, sizeof(*ls_info));
+	
+	/* 读取接口名 */
+	struct json_object *if_name_obj;
+	if (json_object_object_get_ex(link_obj, "if_name", &if_name_obj)) {
+		snprintf(ls_info->if_name, sizeof(ls_info->if_name), "%s",
+		         json_object_get_string(if_name_obj));
+	} else {
+		zlog_err("%s: Missing 'if_name' in link object", __func__);
+		return -1;
+	}
+	
+	/* 读取接口索引 */
+	struct json_object *if_index_obj;
+	if (json_object_object_get_ex(link_obj, "if_index", &if_index_obj)) {
+		ls_info->if_index = json_object_get_int(if_index_obj);
+	}
+	
+	/* 读取NLRI字段 */
+	if (json_object_object_get_ex(link_obj, "nlri", &nlri_obj)) {
+		/* Local Node */
+		if (json_object_object_get_ex(nlri_obj, "local_node", &local_node)) {
+			struct json_object *router_id_obj;
+			if (json_object_object_get_ex(local_node, "router_id", &router_id_obj)) {
+				inet_pton(AF_INET, json_object_get_string(router_id_obj),
+				          &ls_info->router_id);
+			}
+		}
+		
+		/* Remote Node */
+		if (json_object_object_get_ex(nlri_obj, "remote_node", &remote_node)) {
+			struct json_object *router_id_obj;
+			if (json_object_object_get_ex(remote_node, "router_id", &router_id_obj)) {
+				inet_pton(AF_INET, json_object_get_string(router_id_obj),
+				          &ls_info->remote_router_id);
+			}
+		}
+		
+		/* Link Descriptors */
+		if (json_object_object_get_ex(nlri_obj, "link_descriptors", &link_desc)) {
+			struct json_object *local_ipv4_obj, *remote_ipv4_obj;
+			if (json_object_object_get_ex(link_desc, "local_ipv4", &local_ipv4_obj)) {
+				inet_pton(AF_INET, json_object_get_string(local_ipv4_obj),
+				          &ls_info->local_addr);
+			}
+			if (json_object_object_get_ex(link_desc, "remote_ipv4", &remote_ipv4_obj)) {
+				inet_pton(AF_INET, json_object_get_string(remote_ipv4_obj),
+				          &ls_info->remote_addr);
+			}
+		}
+	}
+	
+	/* 读取Attributes字段 */
+	if (json_object_object_get_ex(link_obj, "attributes", &attr_obj)) {
+		struct json_object *val;
+		
+		if (json_object_object_get_ex(attr_obj, "oper_status", &val))
+			ls_info->oper_status = json_object_get_int(val);
+		
+		if (json_object_object_get_ex(attr_obj, "max_bandwidth", &val))
+			ls_info->max_bandwidth = json_object_get_int64(val);
+		
+		if (json_object_object_get_ex(attr_obj, "te_metric", &val))
+			ls_info->te_metric = json_object_get_int(val);
+		
+		if (json_object_object_get_ex(attr_obj, "igp_metric", &val))
+			ls_info->igp_metric = json_object_get_int(val);
+		
+		if (json_object_object_get_ex(attr_obj, "admin_group", &val))
+			ls_info->admin_group = json_object_get_int(val);
+		
+		if (json_object_object_get_ex(attr_obj, "spf_sequence_number", &val))
+			ls_info->spf_sequence_number = json_object_get_int64(val);
+		
+		if (json_object_object_get_ex(attr_obj, "spf_status", &val))
+			ls_info->spf_status = json_object_get_int(val);
+		
+		/* Unreserved Bandwidth数组 */
+		if (json_object_object_get_ex(attr_obj, "unreserved_bw", &unreserved_bw_array)) {
+			int bw_len = json_object_array_length(unreserved_bw_array);
+			for (int j = 0; j < bw_len && j < 8; j++) {
+				struct json_object *bw_obj = json_object_array_get_idx(unreserved_bw_array, j);
+				ls_info->unreserved_bw[j] = json_object_get_int64(bw_obj);
+			}
+		}
+		
+		ls_info->max_reservable_bw = ls_info->max_bandwidth;
+	}
+	
+	ls_info->last_update = time(NULL);
+	
+	return 0;
+}
+
+/**
+ * 处理UDP接收到的JSON数据
+ * 
+ * @param bgp BGP实例
+ * @param json_data JSON数据字符串
+ * @param data_len 数据长度
+ * @return 处理的链路数量，失败返回-1
+ */
+static int process_udp_linkstate_data(struct bgp *bgp, const char *json_data, size_t data_len)
+{
+	struct json_object *root, *links_array, *link_obj;
+	int count = 0;
+	int processed = 0;
+	
+	if (!bgp || !json_data || data_len == 0) {
+		zlog_err("%s: Invalid parameters", __func__);
+		return -1;
+	}
+	
+	/* 解析JSON */
+	root = json_tokener_parse(json_data);
+	if (!root) {
+		zlog_err("%s: Failed to parse JSON data", __func__);
+		return -1;
+	}
+	
+	/* 支持两种格式：
+	 * 1. {"links": [...]} - 批量链路数组
+	 * 2. {"if_name": "...", ...} - 单个链路对象
+	 */
+	if (json_object_object_get_ex(root, "links", &links_array)) {
+		/* 批量链路格式 */
+		int array_len = json_object_array_length(links_array);
+		
+		zlog_info("%s: Processing batch of %d links from UDP",
+		          __func__, array_len);
+		
+		for (int i = 0; i < array_len; i++) {
+			link_obj = json_object_array_get_idx(links_array, i);
+			if (!link_obj)
+				continue;
+			
+			struct linkstate_info ls_info;
+			if (parse_link_json_object(link_obj, &ls_info) != 0) {
+				zlog_warn("%s: Failed to parse link object %d", __func__, i);
+				continue;
+			}
+			
+			count++;
+			int ret = 0;
+			
+			/* 根据 oper_status 判断操作类型 */
+			if (ls_info.oper_status == 0) {
+				/* 链路 DOWN，删除该链路状态 */
+				printf("[BGP-LS-UDP] Link %s is DOWN, calling linkstate_delete\n",
+				       ls_info.if_name);
+				fflush(stdout);
+				
+				ret = linkstate_delete(bgp, ls_info.if_name, SAFI_LINKSTATE);
+			} else {
+				/* 链路 UP，调用 update */
+				printf("[BGP-LS-UDP] Link %s is UP (oper_status=%d), calling linkstate_update\n",
+				       ls_info.if_name, ls_info.oper_status);
+				fflush(stdout);
+				
+				ret = linkstate_update(bgp, &ls_info, SAFI_LINKSTATE);
+			}
+			
+			if (ret == 0)
+				processed++;
+		}
+	} else if (json_object_object_get_ex(root, "if_name", NULL)) {
+		/* 单个链路格式 */
+		struct linkstate_info ls_info;
+		
+		if (parse_link_json_object(root, &ls_info) == 0) {
+			count = 1;
+			int ret = 0;
+			
+			if (ls_info.oper_status == 0) {
+				printf("[BGP-LS-UDP] Link %s is DOWN, calling linkstate_delete\n",
+				       ls_info.if_name);
+				fflush(stdout);
+				
+				ret = linkstate_delete(bgp, ls_info.if_name, SAFI_LINKSTATE);
+			} else {
+				printf("[BGP-LS-UDP] Link %s is UP (oper_status=%d), calling linkstate_update\n",
+				       ls_info.if_name, ls_info.oper_status);
+				fflush(stdout);
+				
+				ret = linkstate_update(bgp, &ls_info, SAFI_LINKSTATE);
+			}
+			
+			if (ret == 0)
+				processed++;
+		}
+	} else {
+		zlog_err("%s: Unknown JSON format - expected 'links' array or single link object",
+		         __func__);
+		json_object_put(root);
+		return -1;
+	}
+	
+	json_object_put(root);
+	
+	zlog_info("%s: Processed %d/%d links from UDP message",
+	          __func__, processed, count);
+	return processed;
+}
+
+/**
+ * UDP服务器事件回调 - 接收并处理链路状态数据
+ * 
+ * @param thread 事件线程
+ */
+static void bgp_linkstate_udp_read(struct event *thread)
+{
+	struct bgp *bgp;
+	char buf[LINKSTATE_UDP_BUF_SIZE];
+	struct sockaddr_in client_addr;
+	socklen_t addr_len = sizeof(client_addr);
+	ssize_t recv_len;
+	
+	bgp = EVENT_ARG(thread);
+	
+	if (!bgp || udp_server_fd < 0) {
+		zlog_err("%s: Invalid state", __func__);
+		return;
+	}
+	
+	/* 接收UDP数据 */
+	recv_len = recvfrom(udp_server_fd, buf, sizeof(buf) - 1, 0,
+	                    (struct sockaddr *)&client_addr, &addr_len);
+	
+	printf("[DEBUG-UDP] recvfrom returned: %zd\n", recv_len);
+	fflush(stdout);
+	
+	if (recv_len < 0) {
+		printf("[DEBUG-UDP] recvfrom error: %s\n", strerror(errno));
+		fflush(stdout);
+		if (errno != EAGAIN && errno != EWOULDBLOCK) {
+			zlog_err("%s: recvfrom failed: %s", __func__, strerror(errno));
+		}
+		goto reschedule;
+	}
+	
+	if (recv_len == 0) {
+		printf("[DEBUG-UDP] recvfrom returned 0, goto reschedule\n");
+		fflush(stdout);
+		goto reschedule;
+	}
+	
+	/* 确保字符串结尾 */
+	buf[recv_len] = '\0';
+	
+	char client_ip[INET_ADDRSTRLEN];
+	inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, sizeof(client_ip));
+	
+	printf("[DEBUG-UDP] Received %zd bytes from %s:%d\n", recv_len, client_ip, ntohs(client_addr.sin_port));
+	printf("[DEBUG-UDP] Data: %s\n", buf);
+	fflush(stdout);
+	
+	zlog_info("%s: Received %zd bytes from %s:%d",
+	          __func__, recv_len, client_ip, ntohs(client_addr.sin_port));
+	
+	/* 处理接收到的JSON数据 */
+	int result = process_udp_linkstate_data(bgp, buf, recv_len);
+	if (result < 0) {
+		zlog_warn("%s: Failed to process UDP data from %s",
+		          __func__, client_ip);
+	}
+	
+reschedule:
+	/* 重新注册读事件 */
+	event_add_read(bm->master, bgp_linkstate_udp_read, bgp,
+	               udp_server_fd, &udp_server_event);
+}
+
+/**
+ * 启动UDP socket服务器接收链路状态信息
+ * 
+ * @param bgp BGP实例
+ * @param port UDP端口号（0表示使用默认端口9999）
+ * @return 0 成功, -1 失败
+ */
+int bgp_linkstate_udp_server_start(struct bgp *bgp, uint16_t port)
+{
+	struct sockaddr_in server_addr;
+	int opt = 1;
+	
+	if (!bgp) {
+		zlog_err("%s: BGP instance is NULL", __func__);
+		return -1;
+	}
+	
+	/* 如果已经在运行，先停止 */
+	if (udp_server_fd >= 0) {
+		zlog_warn("%s: UDP server already running, restarting...", __func__);
+		bgp_linkstate_udp_server_stop();
+	}
+	
+	/* 使用默认端口 */
+	if (port == 0)
+		port = LINKSTATE_UDP_PORT;
+	
+	/* 创建UDP socket */
+	udp_server_fd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (udp_server_fd < 0) {
+		zlog_err("%s: Failed to create UDP socket: %s",
+		         __func__, strerror(errno));
+		return -1;
+	}
+	
+	/* 设置socket选项 */
+	if (setsockopt(udp_server_fd, SOL_SOCKET, SO_REUSEADDR,
+	               &opt, sizeof(opt)) < 0) {
+		zlog_warn("%s: setsockopt SO_REUSEADDR failed: %s",
+		          __func__, strerror(errno));
+	}
+	
+	/* 设置为非阻塞模式 */
+	int flags = fcntl(udp_server_fd, F_GETFL, 0);
+	if (flags >= 0) {
+		fcntl(udp_server_fd, F_SETFL, flags | O_NONBLOCK);
+	}
+	
+	/* 绑定地址 */
+	memset(&server_addr, 0, sizeof(server_addr));
+	server_addr.sin_family = AF_INET;
+	server_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	server_addr.sin_port = htons(port);
+	
+	if (bind(udp_server_fd, (struct sockaddr *)&server_addr,
+	         sizeof(server_addr)) < 0) {
+		zlog_err("%s: Failed to bind UDP socket to port %d: %s",
+		         __func__, port, strerror(errno));
+		close(udp_server_fd);
+		udp_server_fd = -1;
+		return -1;
+	}
+	
+	printf("[BGP-LS-INFO] UDP server started on port %d\n", port);
+	fflush(stdout);
+	
+	zlog_info("%s: UDP server listening on port %d", __func__, port);
+	
+	/* 注册读事件 */
+	event_add_read(bm->master, bgp_linkstate_udp_read, bgp,
+	               udp_server_fd, &udp_server_event);
+	
+	return 0;
+}
+
+/**
+ * 停止UDP socket服务器
+ */
+void bgp_linkstate_udp_server_stop(void)
+{
+	if (udp_server_event) {
+		event_cancel(&udp_server_event);
+		udp_server_event = NULL;
+	}
+	
+	if (udp_server_fd >= 0) {
+		close(udp_server_fd);
+		udp_server_fd = -1;
+		
+		printf("[BGP-LS-INFO] UDP server stopped\n");
+		fflush(stdout);
+		
+		zlog_info("%s: UDP server stopped", __func__);
+	}
 }
 
 /**
@@ -692,6 +1092,13 @@ void bgp_linkstate_poll_start(struct bgp *bgp)
 	       bgp->linkstate_poll_interval, bgp->linkstate_poll_interval);
 	fflush(stdout);
 
+	/* 自动启动UDP服务器（默认端口9999） */
+	if (udp_server_fd < 0) {
+		printf("[BGP-LS-INFO] Auto-starting UDP server on port %d\n", LINKSTATE_UDP_PORT);
+		fflush(stdout);
+		bgp_linkstate_udp_server_start(bgp, 0);
+	}
+
 	/* 延迟第一次轮询，等BGP会话建立 */
 	event_add_timer(bm->master, bgp_linkstate_poll_timer, bgp,
 			bgp->linkstate_poll_interval, &bgp->t_linkstate_poll);
@@ -760,6 +1167,9 @@ void bgp_linkstate_cleanup(struct bgp *bgp)
 
 	/* 停止轮询 */
 	bgp_linkstate_poll_stop(bgp);
+
+	/* 停止UDP服务器 */
+	bgp_linkstate_udp_server_stop();
 
 	/* 清理状态缓存 */
 	if (bgp->linkstate_cache) {
@@ -878,6 +1288,45 @@ DEFUN(linkstate_monitor_interface,
 	return CMD_SUCCESS;
 }
 
+DEFUN(linkstate_udp_server,
+      linkstate_udp_server_cmd,
+      "linkstate udp-server [port (1024-65535)]",
+      "Link-state information\n"
+      "Start UDP server for link-state updates\n"
+      "UDP port number\n"
+      "Port number (default: 9999)\n")
+{
+	VTY_DECLVAR_CONTEXT(bgp, bgp);
+	uint16_t port = 0;
+	int idx = 0;
+
+	if (argv_find(argv, argc, "(1024-65535)", &idx)) {
+		port = strtoul(argv[idx]->arg, NULL, 10);
+	}
+
+	if (bgp_linkstate_udp_server_start(bgp, port) == 0) {
+		vty_out(vty, "%% UDP server started on port %d\n",
+		        port ? port : LINKSTATE_UDP_PORT);
+	} else {
+		vty_out(vty, "%% Failed to start UDP server\n");
+		return CMD_WARNING;
+	}
+
+	return CMD_SUCCESS;
+}
+
+DEFUN(no_linkstate_udp_server,
+      no_linkstate_udp_server_cmd,
+      "no linkstate udp-server",
+      NO_STR
+      "Link-state information\n"
+      "Stop UDP server for link-state updates\n")
+{
+	bgp_linkstate_udp_server_stop();
+	vty_out(vty, "%% UDP server stopped\n");
+	return CMD_SUCCESS;
+}
+
 void bgp_linkstate_poll_init(void)
 {
 	zlog_info("BGP Linkstate Poll: Initializing VTY commands");
@@ -887,6 +1336,8 @@ void bgp_linkstate_poll_init(void)
 	install_element(BGP_NODE, &no_linkstate_monitor_cmd);
 	install_element(BGP_NODE, &linkstate_poll_interval_cmd);
 	install_element(BGP_NODE, &linkstate_monitor_interface_cmd);
+	install_element(BGP_NODE, &linkstate_udp_server_cmd);
+	install_element(BGP_NODE, &no_linkstate_udp_server_cmd);
 	
 	zlog_info("BGP Linkstate Poll: VTY commands installed successfully");
 }

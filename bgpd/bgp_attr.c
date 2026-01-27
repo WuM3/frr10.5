@@ -46,8 +46,9 @@
 #include "bgp_linkstate_tlv.h"
 #include "bgp_mac.h"
 
-DEFINE_MTYPE_STATIC(BGPD, BGP_ATTR_LS, "BGP Attribute Link-State");
-DEFINE_MTYPE_STATIC(BGPD, BGP_ATTR_LS_DATA, "BGP Attribute Link-State Data");
+/* 这些 MTYPE 需要导出给 bgp_linkstate.c 使用 */
+DEFINE_MTYPE(BGPD, BGP_ATTR_LS, "BGP Attribute Link-State");
+DEFINE_MTYPE(BGPD, BGP_ATTR_LS_DATA, "BGP Attribute Link-State Data");
 
 /* Attribute strings for logging. */
 static const struct message attr_str[] = {

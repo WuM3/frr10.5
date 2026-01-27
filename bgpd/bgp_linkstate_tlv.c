@@ -753,18 +753,41 @@ int bgp_nlri_parse_bgpls_spf(struct peer *peer, struct attr *attr,
 }
 
 /*
- * Encode Link-State prefix in Update (MP_REACH)
+ * Encode Link-State prefix in Update (MP_REACH or MP_UNREACH)
+ * 
+ * 关键修复：支持 WITHDRAW 场景
+ * - 如果 ls_data 有效，从语义数据实时编码 NLRI
+ * - 如果 ls_data 为 NULL（WITHDRAW 场景），使用预编码的 nlri_buf
+ * 
+ * 这解决了 bgp_process() 异步执行时 ls_data 已被释放的 UAF 问题
  */
 void bgp_nlri_encode_linkstate(struct stream *s, const struct prefix *p)
 {
 	uint8_t nlri_buf[256];
 	size_t offset = 0;
 
-	/* Get semantic data from prefix */
+	/* 关键修复：检查是否有预编码的 NLRI 缓冲区
+	 * WITHDRAW 场景下，ls_data 可能为 NULL，但 nlri_buf 仍然有效
+	 */
+	if (p->u.prefix_linkstate.nlri_len > 0) {
+		/* 使用预编码的缓冲区（适用于 ADD/UPDATE/WITHDRAW 所有场景）*/
+		zlog_debug("BGPLS: encode_linkstate using pre-encoded buffer (len=%u)",
+		           p->u.prefix_linkstate.nlri_len);
+		stream_putw(s, p->u.prefix_linkstate.nlri_type);  /* NLRI Type */
+		stream_putw(s, p->u.prefix_linkstate.nlri_len);   /* NLRI Length */
+		stream_put(s, p->u.prefix_linkstate.nlri_buf, 
+		           p->u.prefix_linkstate.nlri_len);       /* NLRI Data */
+		return;
+	}
+
+	/* 回退路径：从 ls_data 实时编码（兼容旧代码路径）*/
 	const struct linkstate_info *ls_info = p->u.prefix_linkstate.ls_data;
 	
 	if (!ls_info) {
-		zlog_err("BGPLS: encode_linkstate called with NULL ls_data");
+		zlog_err("BGPLS: encode_linkstate called with NULL ls_data and no pre-encoded buffer");
+		/* 写入最小有效 NLRI 以避免崩溃 */
+		stream_putw(s, p->u.prefix_linkstate.nlri_type);
+		stream_putw(s, 0);  /* 空 NLRI */
 		return;
 	}
 
