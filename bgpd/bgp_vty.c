@@ -67,6 +67,7 @@
 #include "bgpd/bgp_flowspec.h"
 #include "bgpd/bgp_conditional_adv.h"
 #include "bgpd/bgp_srv6.h"
+#include "bgpd/bgp_linkstate_vty.h"
 #ifdef ENABLE_BGP_VNC
 #include "bgpd/rfapi/bgp_rfapi_cfg.h"
 #endif
@@ -20528,6 +20529,8 @@ int bgp_config_write(struct vty *vty)
 
 		/* coalesce time */
 		bgp_config_write_coalesce_time(vty, bgp);
+		/* Link-State configuration */
+		bgp_config_write_linkstate(vty, bgp);
 
 		/* BGP per-instance graceful-shutdown */
 		/* BGP-wide settings and per-instance settings are mutually

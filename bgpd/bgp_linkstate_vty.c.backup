@@ -102,7 +102,7 @@ DEFPY(bgp_linkstate_interface,
         }
     }
     
-    listnode_add(bgp->linkstate_if_list, XSTRDUP(MTYPE_BGP_NAME, ifname));
+    listnode_add(bgp->linkstate_if_list, XSTRDUP(MTYPE_TMP, ifname));
     
     return CMD_SUCCESS;
 }
@@ -126,7 +126,7 @@ DEFPY(no_bgp_linkstate_interface,
     for (ALL_LIST_ELEMENTS(bgp->linkstate_if_list, node, nnode, existing)) {
         if (strcmp(existing, ifname) == 0) {
             list_delete_node(bgp->linkstate_if_list, node);
-            XFREE(MTYPE_BGP_NAME, existing);
+            XFREE(MTYPE_TMP, existing);
             return CMD_SUCCESS;
         }
     }
