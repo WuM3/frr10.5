@@ -294,16 +294,33 @@ static int group_announce_route_walkcb(struct update_group *updgrp, void *arg)
 			} else {
 				if (afi == AFI_LINKSTATE) {
 					printf("[BGP-LS-INFO] ctx->pi is NULL, using adj_out\n");
+					printf("[BGP-LS-INFO] ctx->dest=%p, checking adj_out tree...\n", (void*)ctx->dest);
 					fflush(stdout);
+				}
+				if (!ctx->dest) {
+					if (afi == AFI_LINKSTATE) {
+						printf("[BGP-LS-ERROR] ctx->dest is NULL, skipping adj_out iteration\n");
+						fflush(stdout);
+					}
+					goto done;
 				}
 				RB_FOREACH_SAFE (adj, bgp_adj_out_rb, &ctx->dest->adj_out,
 						 adj_next) {
 					if (adj->subgroup == subgrp) {
+						if (afi == AFI_LINKSTATE) {
+							printf("[BGP-LS-INFO] Processing adj_out: adj=%p, subgroup=%p\n", 
+							       (void*)adj, (void*)subgrp);
+							fflush(stdout);
+						}
 						subgroup_process_announce_selected(subgrp, NULL,
 										   ctx->dest, afi,
 										   safi,
 										   adj->addpath_tx_id);
 					}
+				}
+				if (afi == AFI_LINKSTATE) {
+					printf("[BGP-LS-INFO] Finished processing adj_out\n");
+					fflush(stdout);
 				}
 			}
 		}

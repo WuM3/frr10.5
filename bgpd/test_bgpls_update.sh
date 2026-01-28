@@ -242,6 +242,117 @@ echo ""
 echo "[CHECK] 查看DELETE相关日志:"
 grep -E "DELETE|WITHDRAW|linkstate_delete" /tmp/ns1_bgpd.log 2>/dev/null | tail -10 || echo "  (无DELETE日志)"
 
+echo ""
+echo "=========================================="
+echo " NODE NLRI 测试"
+echo "=========================================="
+
+echo ""
+echo "[TEST] 发送节点状态数据 (NODE ADD)..."
+NODE_ADD_DATA='{
+  "version": "1.0",
+  "timestamp": "2026-01-26T20:31:00Z",
+  "nodes": [
+    {
+      "node_name": "router1",
+      "nlri": {
+        "protocol_id": 5,
+        "identifier": 123456,
+        "router_id": "192.168.1.1",
+        "area_id": "0.0.0.0",
+        "asn": 65001
+      },
+      "attributes": {
+        "node_flags": 0,
+        "node_name": "router1",
+        "isis_area_id": "49.0001",
+        "sr_capabilities": 1,
+        "srgb_base": 16000,
+        "srgb_range": 8000,
+        "sr_algorithm": 0
+      }
+    }
+  ]
+}'
+
+echo "$NODE_ADD_DATA" | sudo ip netns exec ns1 nc -u -w1 127.0.0.1 9999
+sleep 2
+
+echo ""
+echo "[CHECK] 查看NODE ADD相关日志:"
+grep -E "NODE|nodestate|BGP-LS.*[Nn]ode" /tmp/ns1_bgpd.log 2>/dev/null | tail -10 || echo "  (无NODE日志)"
+
+echo ""
+echo "[TEST] 发送节点状态数据 (NODE UPDATE)..."
+NODE_UPDATE_DATA='{
+  "version": "1.0",
+  "timestamp": "2026-01-26T20:31:05Z",
+  "nodes": [
+    {
+      "node_name": "router1",
+      "nlri": {
+        "protocol_id": 5,
+        "identifier": 123456,
+        "router_id": "192.168.1.1",
+        "area_id": "0.0.0.0",
+        "asn": 65001
+      },
+      "attributes": {
+        "node_flags": 1,
+        "node_name": "router1-updated",
+        "isis_area_id": "49.0001",
+        "sr_capabilities": 3,
+        "srgb_base": 16000,
+        "srgb_range": 8000,
+        "sr_algorithm": 1
+      }
+    }
+  ]
+}'
+
+echo "$NODE_UPDATE_DATA" | sudo ip netns exec ns1 nc -u -w1 127.0.0.1 9999
+sleep 2
+
+echo ""
+echo "[CHECK] 查看NODE UPDATE相关日志:"
+grep -E "NODE|nodestate|BGP-LS.*[Nn]ode" /tmp/ns1_bgpd.log 2>/dev/null | tail -10 || echo "  (无NODE UPDATE日志)"
+
+echo ""
+echo "[TEST] 发送节点状态数据 (NODE DELETE)..."
+NODE_DELETE_DATA='{
+  "version": "1.0",
+  "timestamp": "2026-01-26T20:31:10Z",
+  "nodes": [
+    {
+      "node_name": "router1",
+      "nlri": {
+        "protocol_id": 5,
+        "identifier": 123456,
+        "router_id": "192.168.1.1",
+        "area_id": "0.0.0.0",
+        "asn": 65001
+      },
+      "attributes": {
+        "node_flags": 0,
+        "node_name": "router1",
+        "isis_area_id": "49.0001",
+        "sr_capabilities": 0,
+        "srgb_base": 0,
+        "srgb_range": 0,
+        "sr_algorithm": 0,
+        "oper_status": 0
+      }
+    }
+  ]
+}'
+
+echo "$NODE_DELETE_DATA" | sudo ip netns exec ns1 nc -u -w1 127.0.0.1 9999
+sleep 2
+
+echo ""
+echo "[CHECK] 查看NODE DELETE相关日志:"
+grep -E "NODE|nodestate_delete|WITHDRAW.*[Nn]ode" /tmp/ns1_bgpd.log 2>/dev/null | tail -10 || echo "  (无NODE DELETE日志)"
+
 # 停止抓包
 sleep 1
 sudo kill $TCPDUMP_PID 2>/dev/null || true

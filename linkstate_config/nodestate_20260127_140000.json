@@ -1,0 +1,62 @@
+{
+  "nodes": [
+    {
+      "node_name": "R1",
+      "nlri": {
+        "protocol_id": 5,
+        "identifier": 1001,
+        "local_node_descriptors": {
+          "asn": 65001,
+          "bgpls_id": 1,
+          "ospf_area_id": 0,
+          "router_id": "10.0.0.1"
+        }
+      },
+      "attributes": {
+        "node_flags": 0,
+        "te_router_id": "10.0.0.1",
+        "sr_capabilities": {
+          "flags": 128,
+          "srgb_base": 16000,
+          "srgb_range": 8000
+        },
+        "sr_algorithms": [0, 1],
+        "sr_local_block": {
+          "srlb_base": 15000,
+          "srlb_range": 1000
+        },
+        "srms_preference": 100,
+        "oper_status": 1
+      }
+    },
+    {
+      "node_name": "R2",
+      "nlri": {
+        "protocol_id": 5,
+        "identifier": 1002,
+        "local_node_descriptors": {
+          "asn": 65001,
+          "bgpls_id": 1,
+          "ospf_area_id": 0,
+          "router_id": "10.0.0.2"
+        }
+      },
+      "attributes": {
+        "node_flags": 0,
+        "te_router_id": "10.0.0.2",
+        "sr_capabilities": {
+          "flags": 128,
+          "srgb_base": 16000,
+          "srgb_range": 8000
+        },
+        "sr_algorithms": [0, 1],
+        "sr_local_block": {
+          "srlb_base": 15000,
+          "srlb_range": 1000
+        },
+        "srms_preference": 100,
+        "oper_status": 1
+      }
+    }
+  ]
+}
