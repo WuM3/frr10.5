@@ -18,6 +18,7 @@
 #include "bgpd/bgp_zebra.h"
 #include "bgpd/bgp_vty.h"
 #include "bgpd/bgp_debug.h"
+#include "bgpd/bgp_linkstate_poll.h"
 
 #include "bgpd/bgp_linkstate_vty_clippy.c"
 
