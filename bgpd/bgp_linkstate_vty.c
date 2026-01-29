@@ -9,6 +9,8 @@
 #include "lib/json.h"
 #include "lib/printfrr.h"
 #include "stream.h"
+#include "linklist.h"
+#include "memory.h"
 
 #include "bgpd/bgpd.h"
 #include "bgpd/bgp_linkstate_vty.h"
@@ -45,9 +47,204 @@ DEFPY (debug_bgp_linkstate,
 	return CMD_SUCCESS;
 }
 
+/* Link-State polling configuration commands */
+
+DEFPY(bgp_linkstate_poll_interval,
+      bgp_linkstate_poll_interval_cmd,
+      "bgp linkstate poll-interval (5-3600)$interval",
+      BGP_STR
+      "BGP Link-State\n"
+      "Configure polling interval\n"
+      "Polling interval in seconds (5-3600)\n")
+{
+    VTY_DECLVAR_CONTEXT(bgp, bgp);
+    
+    bgp_linkstate_set_poll_interval(bgp, interval);
+    
+    return CMD_SUCCESS;
+}
+
+DEFPY(no_bgp_linkstate_poll_interval,
+      no_bgp_linkstate_poll_interval_cmd,
+      "no bgp linkstate poll-interval [(5-3600)]",
+      NO_STR
+      BGP_STR
+      "BGP Link-State\n"
+      "Configure polling interval\n"
+      "Polling interval in seconds\n")
+{
+    VTY_DECLVAR_CONTEXT(bgp, bgp);
+    
+    /* 恢复默认值 30秒 */
+    bgp_linkstate_set_poll_interval(bgp, 30);
+    
+    return CMD_SUCCESS;
+}
+
+DEFPY(bgp_linkstate_interface,
+      bgp_linkstate_interface_cmd,
+      "bgp linkstate interface IFNAME$ifname",
+      BGP_STR
+      "BGP Link-State\n"
+      "Monitor interface\n"
+      "Interface name\n")
+{
+    VTY_DECLVAR_CONTEXT(bgp, bgp);
+    
+    if (!bgp->linkstate_if_list)
+        bgp->linkstate_if_list = list_new();
+    
+    /* 检查是否已存在 */
+    struct listnode *node;
+    char *existing;
+    for (ALL_LIST_ELEMENTS_RO(bgp->linkstate_if_list, node, existing)) {
+        if (strcmp(existing, ifname) == 0) {
+            vty_out(vty, "%% Interface %s already configured\n", ifname);
+            return CMD_WARNING;
+        }
+    }
+    
+    listnode_add(bgp->linkstate_if_list, XSTRDUP(MTYPE_BGP_NAME, ifname));
+    
+    return CMD_SUCCESS;
+}
+
+DEFPY(no_bgp_linkstate_interface,
+      no_bgp_linkstate_interface_cmd,
+      "no bgp linkstate interface IFNAME$ifname",
+      NO_STR
+      BGP_STR
+      "BGP Link-State\n"
+      "Monitor interface\n"
+      "Interface name\n")
+{
+    VTY_DECLVAR_CONTEXT(bgp, bgp);
+    
+    if (!bgp->linkstate_if_list)
+        return CMD_SUCCESS;
+    
+    struct listnode *node, *nnode;
+    char *existing;
+    for (ALL_LIST_ELEMENTS(bgp->linkstate_if_list, node, nnode, existing)) {
+        if (strcmp(existing, ifname) == 0) {
+            list_delete_node(bgp->linkstate_if_list, node);
+            XFREE(MTYPE_BGP_NAME, existing);
+            return CMD_SUCCESS;
+        }
+    }
+    
+    vty_out(vty, "%% Interface %s not found\n", ifname);
+    return CMD_WARNING;
+}
+
+DEFPY(bgp_linkstate_poll_enable,
+      bgp_linkstate_poll_enable_cmd,
+      "bgp linkstate poll enable",
+      BGP_STR
+      "BGP Link-State\n"
+      "Polling configuration\n"
+      "Enable Link-State polling\n")
+{
+    VTY_DECLVAR_CONTEXT(bgp, bgp);
+    
+    bgp_linkstate_poll_start(bgp);
+    
+    return CMD_SUCCESS;
+}
+
+DEFPY(no_bgp_linkstate_poll_enable,
+      no_bgp_linkstate_poll_enable_cmd,
+      "no bgp linkstate poll enable",
+      NO_STR
+      BGP_STR
+      "BGP Link-State\n"
+      "Polling configuration\n"
+      "Disable Link-State polling\n")
+{
+    VTY_DECLVAR_CONTEXT(bgp, bgp);
+    
+    bgp_linkstate_poll_stop(bgp);
+    
+    return CMD_SUCCESS;
+}
+
+/* Show commands */
+
+DEFPY(show_bgp_linkstate,
+      show_bgp_linkstate_cmd,
+      "show bgp linkstate",
+      SHOW_STR
+      BGP_STR
+      "BGP Link-State information\n")
+{
+    struct bgp *bgp = bgp_get_default();
+    
+    if (!bgp) {
+        vty_out(vty, "%% No BGP instance\n");
+        return CMD_WARNING;
+    }
+    
+    vty_out(vty, "BGP Link-State Configuration:\n");
+    vty_out(vty, "  Status: %s\n", 
+        bgp->t_linkstate_poll ? "Active" : "Inactive");
+    vty_out(vty, "  Poll Interval: %u seconds\n", 
+        bgp->linkstate_poll_interval);
+    
+    if (bgp->linkstate_if_list && listcount(bgp->linkstate_if_list) > 0) {
+        struct listnode *node;
+        char *ifname;
+        int count = 1;
+        
+        vty_out(vty, "  Monitored Interfaces:\n");
+        for (ALL_LIST_ELEMENTS_RO(bgp->linkstate_if_list, node, ifname)) {
+            vty_out(vty, "    %d. %s\n", count++, ifname);
+        }
+    } else {
+        vty_out(vty, "  Monitored Interfaces: All active interfaces\n");
+    }
+    
+    return CMD_SUCCESS;
+}
+
+void bgp_config_write_linkstate(struct vty *vty, struct bgp *bgp)
+{
+    /* 写入轮询间隔 */
+    if (bgp->linkstate_poll_interval && 
+        bgp->linkstate_poll_interval != 30) {
+        vty_out(vty, " bgp linkstate poll-interval %u\n",
+            bgp->linkstate_poll_interval);
+    }
+
+    /* 写入监控接口列表 */
+    if (bgp->linkstate_if_list && listcount(bgp->linkstate_if_list) > 0) {
+        struct listnode *node;
+        char *ifname;
+
+        for (ALL_LIST_ELEMENTS_RO(bgp->linkstate_if_list, node, ifname)) {
+            vty_out(vty, " bgp linkstate interface %s\n", ifname);
+        }
+    }
+
+    /* 写入启用状态 */
+    if (bgp->t_linkstate_poll) {
+        vty_out(vty, " bgp linkstate poll enable\n");
+    }
+}
 
 void bgp_linkstate_vty_init(void)
 {
-	install_element(ENABLE_NODE, &debug_bgp_linkstate_cmd);
-	install_element(CONFIG_NODE, &debug_bgp_linkstate_cmd);
+    install_element(ENABLE_NODE, &debug_bgp_linkstate_cmd);
+    install_element(CONFIG_NODE, &debug_bgp_linkstate_cmd);
+    
+    /* Install Link-State configuration commands */
+    install_element(BGP_NODE, &bgp_linkstate_poll_interval_cmd);
+    install_element(BGP_NODE, &no_bgp_linkstate_poll_interval_cmd);
+    install_element(BGP_NODE, &bgp_linkstate_interface_cmd);
+    install_element(BGP_NODE, &no_bgp_linkstate_interface_cmd);
+    install_element(BGP_NODE, &bgp_linkstate_poll_enable_cmd);
+    install_element(BGP_NODE, &no_bgp_linkstate_poll_enable_cmd);
+    
+    /* Install show commands */
+    install_element(VIEW_NODE, &show_bgp_linkstate_cmd);
+    install_element(ENABLE_NODE, &show_bgp_linkstate_cmd);
 }

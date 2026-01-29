@@ -619,7 +619,7 @@ fflush(stdout);
 	 * 
 	 * 这是 BGP-LS 本地路由注入的标准方法（参考旧版本第666行）
 	 */
-	attr_new = bgp_attr_intern(&attr);
+	/* 注意: attr_new 已在上面 intern（第577行），不要重复调用 */
 	
 	pi = info_make(ZEBRA_ROUTE_BGP,
 	               BGP_ROUTE_STATIC,
@@ -666,20 +666,19 @@ fflush(stdout);
 	
 	if (peer_count == 0) {
 		zlog_warn("linkstate_add: No peers available to announce BGP-LS route");
-		printf("[BGP-LS-WARN] No established peers with BGP-LS capability\n");
+		printf("[BGP-LS-WARN] No established peers with BGP-LS capability, skipping bgp_process\n");
 		fflush(stdout);
-		bgp_dest_unlock_node(dest);
-		return 0;  /* 不是错误，只是没有peer */
+		/* 注意：不要提前返回！仍然需要添加到哈希表 */
+	} else {
+		/* 触发 BGP 处理（会向所有 peer 发送 UPDATE）*/
+		printf("[BGP-LS-ADD] Calling bgp_process (will announce to all peers)\n");
+		fflush(stdout);
+		
+		bgp_process(bgp, dest, pi, AFI_LINKSTATE, safi);
+		
+		printf("[BGP-LS-ADD] bgp_process completed, announced to %d peer(s)\n", peer_count);
+		fflush(stdout);
 	}
-	
-	/* 触发 BGP 处理（会向所有 peer 发送 UPDATE）*/
-	printf("[BGP-LS-ADD] Calling bgp_process (will announce to all peers)\n");
-	fflush(stdout);
-	
-	bgp_process(bgp, dest, pi, AFI_LINKSTATE, safi);
-	
-	printf("[BGP-LS-ADD] bgp_process completed, announced to %d peer(s)\n", peer_count);
-	fflush(stdout);
 	
 	//6: 插入哈希表映射（if_name → dest + linkstate_info）
 	if (!bgp->linkstate_if_map) {
@@ -788,13 +787,16 @@ int linkstate_update(struct bgp *bgp, struct linkstate_info *ls_info, safi_t saf
 	printf("[BGP-LS-UPDATE] Found dest=%p for if_name='%s'\n", (void*)dest, ls_info->if_name);
 	fflush(stdout);
 	
+	/* 增加引用计数，防止在操作过程中被释放 */
+	bgp_dest_lock_node(dest);
+	
 	//3: 检查该节点是否有路径信息（判断是add还是update）
 	pi = bgp_dest_get_bgp_path_info(dest);
 	if (!pi) {
 		/* 节点存在但没有路径信息，需要调用add */
 		printf("[BGP-LS-UPDATE] No path_info found, calling linkstate_add\n");
 		fflush(stdout);
-		bgp_dest_unlock_node(dest);  // 释放get的锁
+		bgp_dest_unlock_node(dest);  // 释放我们的锁
 		return linkstate_add(bgp, ls_info, safi);
 	}
 	// 数据来源：dest->info（路径信息链表头）
@@ -842,6 +844,29 @@ int linkstate_update(struct bgp *bgp, struct linkstate_info *ls_info, safi_t saf
 	 * - 旧 attr 通过 unintern 递减 refcnt，如果归零则释放
 	 */
 	struct attr *old_attr = pi->attr;   // 保存旧指针
+	
+	/* 安全检查：验证 old_attr 是有效的 */
+	if (!old_attr) {
+		printf("[BGP-LS-UPDATE-ERROR] old_attr is NULL!\n");
+		fflush(stdout);
+		bgp_attr_unintern(&attr_new);
+		bgp_dest_unlock_node(dest);
+		return -1;
+	}
+	
+	/* 检查 refcnt 是否在合理范围内（防止使用已释放的内存）*/
+	if (old_attr->refcnt == 0 || old_attr->refcnt > 100000) {
+		printf("[BGP-LS-UPDATE-ERROR] old_attr refcnt=%u looks invalid, skipping unintern\n", 
+		       old_attr->refcnt);
+		fflush(stdout);
+		/* 直接替换，不 unintern 旧的（可能会导致内存泄漏，但避免崩溃）*/
+		pi->attr = attr_new;
+		pi->uptime = monotime(NULL);
+		SET_FLAG(pi->flags, BGP_PATH_ATTR_CHANGED);
+		bgp_process(bgp, dest, pi, AFI_LINKSTATE, safi);
+		bgp_dest_unlock_node(dest);
+		return 0;
+	}
 	
 	printf("[BGP-LS-UPDATE] old_attr=%p (refcnt=%u), new_attr=%p (refcnt=%u)\n", 
 	       (void*)old_attr, old_attr->refcnt, (void*)attr_new, attr_new->refcnt);
@@ -947,12 +972,16 @@ int linkstate_delete(struct bgp *bgp, const char *if_name,safi_t safi)
 	printf("[BGP-LS-DELETE] Got dest=%p from hash, getting path_info...\n", (void*)dest);
 	fflush(stdout);
 	
+	/* 增加引用计数，防止在 bgp_process 异步处理过程中被释放 */
+	bgp_dest_lock_node(dest);
+	
 	//2: 获取路径信息
 	pi = bgp_dest_get_bgp_path_info(dest);
 	if (!pi) {
 		printf("[BGP-LS-DELETE-ERROR] No path_info found!\n");
 		fflush(stdout);
 		zlog_warn("%s: No path_info for %s", __func__, if_name);
+		bgp_dest_unlock_node(dest);
 		return -1;
 	}
 	
@@ -988,6 +1017,9 @@ int linkstate_delete(struct bgp *bgp, const char *if_name,safi_t safi)
 	printf("[BGP-LS-DELETE] bgp_process queued, will send WITHDRAW\n");
 	fflush(stdout);
 	
+	/* 释放我们持有的引用 */
+	bgp_dest_unlock_node(dest);
+	
 	//4: 从哈希表删除映射（但不释放 dest，FRR 会处理）
 	wrapper = hash_release(bgp->linkstate_if_map, &lookup_key);
 	if (wrapper) {
@@ -1003,6 +1035,651 @@ int linkstate_delete(struct bgp *bgp, const char *if_name,safi_t safi)
 	fflush(stdout);
 	
 	zlog_info("%s: Delete queued successfully for %s", __func__, if_name);
+	return 0;
+}
+
+/* ========================================================================
+ * Node State (BGP-LS Node NLRI) 处理函数实现
+ * 基于 RFC 7752 Node NLRI 和 RFC 9085 SR Node Attributes
+ * ======================================================================== */
+
+/* Node State 哈希表包装器 */
+struct nodestate_prefix_wrapper {
+	char node_name[256];            /* 节点名称（作为哈希键）*/
+	struct nodestate_info ns_info;  /* Node State信息副本 */
+	struct bgp_dest *dest;          /* RIB节点指针 */
+};
+
+/* 内存类型定义 */
+DEFINE_MTYPE_STATIC(BGPD, BGP_NODESTATE_WRAPPER, "BGP NodeState Wrapper");
+
+/* 哈希表操作函数 */
+
+/* 计算哈希值（基于节点名）*/
+static unsigned int nodestate_map_hash_key(const void *data)
+{
+	const struct nodestate_prefix_wrapper *wrapper = data;
+	return string_hash_make(wrapper->node_name);
+}
+
+/* 比较两个节点名是否相等 */
+static bool nodestate_map_cmp(const void *d1, const void *d2)
+{
+	const struct nodestate_prefix_wrapper *w1 = d1;
+	const struct nodestate_prefix_wrapper *w2 = d2;
+	return (strcmp(w1->node_name, w2->node_name) == 0);
+}
+
+/* 哈希表分配函数 */
+static void *nodestate_map_alloc(void *data)
+{
+	struct nodestate_prefix_wrapper *wrapper_in = data;
+	struct nodestate_prefix_wrapper *wrapper_out;
+	
+	wrapper_out = XCALLOC(MTYPE_BGP_NODESTATE_WRAPPER,
+	                      sizeof(struct nodestate_prefix_wrapper));
+	strncpy(wrapper_out->node_name, wrapper_in->node_name, sizeof(wrapper_out->node_name) - 1);
+	memcpy(&wrapper_out->ns_info, &wrapper_in->ns_info, sizeof(wrapper_out->ns_info));
+	
+	return wrapper_out;
+}
+
+/* 哈希清理回调函数 */
+static void nodestate_prefix_free(void *data)
+{
+	if (data)
+		XFREE(MTYPE_BGP_NODESTATE_WRAPPER, data);
+}
+
+/* 初始化Node State哈希表 */
+void bgp_nodestate_map_init(struct bgp *bgp)
+{
+	if (!bgp->nodestate_map) {
+		bgp->nodestate_map = hash_create(nodestate_map_hash_key,
+		                                  nodestate_map_cmp,
+		                                  "BGP NodeState Map");
+		zlog_info("%s: Initialized nodestate map", __func__);
+	}
+}
+
+/* 清理Node State哈希表 */
+void bgp_nodestate_map_finish(struct bgp *bgp)
+{
+	if (bgp->nodestate_map) {
+		hash_clean(bgp->nodestate_map, nodestate_prefix_free);
+		hash_free(bgp->nodestate_map);
+		bgp->nodestate_map = NULL;
+		zlog_info("%s: Cleaned up nodestate map", __func__);
+	}
+}
+
+/**
+ * 构造BGP-LS Node NLRI
+ * 
+ * RFC 7752 Figure 7 - Node NLRI Format:
+ *   - Protocol-ID (1 byte)
+ *   - Identifier (8 bytes)
+ *   - Local Node Descriptors (variable)
+ * 
+ * @param p        输出的prefix结构
+ * @param ns_info  节点状态信息
+ * @return 0 成功, -1 失败
+ */
+static int build_bgpls_node_nlri(struct prefix *p, struct nodestate_info *ns_info)
+{
+	uint8_t *buf;
+	size_t offset = 0;
+	
+	if (!p || !ns_info) {
+		return -1;
+	}
+	
+	zlog_debug("BGPLS: build_bgpls_node_nlri for node_name=%s", ns_info->node_name);
+
+	memset(p, 0, sizeof(*p));
+	p->family = AF_LINKSTATE;
+	p->u.prefix_linkstate.nlri_type = BGPLS_NLRI_TYPE_NODE;  /* Node NLRI = 0x0001 */
+	p->u.prefix_linkstate.ls_data = ns_info;
+	p->prefixlen = 128;  /* Nominal value for prefix comparison */
+
+	/* 预编码 NLRI 到缓冲区 */
+	buf = p->u.prefix_linkstate.nlri_buf;
+	
+	/* 1. Protocol-ID (1 byte) - RFC 7752 Table 2 */
+	buf[offset++] = ns_info->protocol_id ? ns_info->protocol_id : BGPLS_PROTOCOL_STATIC;
+
+	/* 2. Identifier (8 bytes) */
+	uint64_t identifier = ns_info->identifier;
+	buf[offset++] = (identifier >> 56) & 0xFF;
+	buf[offset++] = (identifier >> 48) & 0xFF;
+	buf[offset++] = (identifier >> 40) & 0xFF;
+	buf[offset++] = (identifier >> 32) & 0xFF;
+	buf[offset++] = (identifier >> 24) & 0xFF;
+	buf[offset++] = (identifier >> 16) & 0xFF;
+	buf[offset++] = (identifier >> 8) & 0xFF;
+	buf[offset++] = identifier & 0xFF;
+
+	/* 3. Local Node Descriptors (TLV 256 = 0x0100) */
+	buf[offset++] = 0x01;
+	buf[offset++] = 0x00;
+	size_t local_node_len_offset = offset;
+	offset += 2;  /* placeholder for length */
+
+	/* Sub-TLV 512 (0x0200): Autonomous System (4 bytes) */
+	if (ns_info->asn != 0) {
+		buf[offset++] = 0x02;
+		buf[offset++] = 0x00;
+		buf[offset++] = 0x00;
+		buf[offset++] = 0x04;
+		buf[offset++] = (ns_info->asn >> 24) & 0xFF;
+		buf[offset++] = (ns_info->asn >> 16) & 0xFF;
+		buf[offset++] = (ns_info->asn >> 8) & 0xFF;
+		buf[offset++] = ns_info->asn & 0xFF;
+	}
+
+	/* Sub-TLV 513 (0x0201): BGP-LS Identifier (4 bytes) */
+	if (ns_info->bgpls_id != 0) {
+		buf[offset++] = 0x02;
+		buf[offset++] = 0x01;
+		buf[offset++] = 0x00;
+		buf[offset++] = 0x04;
+		buf[offset++] = (ns_info->bgpls_id >> 24) & 0xFF;
+		buf[offset++] = (ns_info->bgpls_id >> 16) & 0xFF;
+		buf[offset++] = (ns_info->bgpls_id >> 8) & 0xFF;
+		buf[offset++] = ns_info->bgpls_id & 0xFF;
+	}
+
+	/* Sub-TLV 514 (0x0202): OSPF Area-ID (4 bytes) */
+	if (ns_info->ospf_area_id != 0) {
+		buf[offset++] = 0x02;
+		buf[offset++] = 0x02;
+		buf[offset++] = 0x00;
+		buf[offset++] = 0x04;
+		buf[offset++] = (ns_info->ospf_area_id >> 24) & 0xFF;
+		buf[offset++] = (ns_info->ospf_area_id >> 16) & 0xFF;
+		buf[offset++] = (ns_info->ospf_area_id >> 8) & 0xFF;
+		buf[offset++] = ns_info->ospf_area_id & 0xFF;
+	}
+
+	/* Sub-TLV 515 (0x0203): IGP Router-ID */
+	if (ns_info->router_id.s_addr != 0) {
+		/* IPv4 Router-ID (4 bytes for OSPF) */
+		buf[offset++] = 0x02;
+		buf[offset++] = 0x03;
+		buf[offset++] = 0x00;
+		buf[offset++] = 0x04;
+		memcpy(&buf[offset], &ns_info->router_id.s_addr, 4);
+		offset += 4;
+	} else if (ns_info->iso_node_id_len > 0) {
+		/* IS-IS ISO System-ID (6 or 7 bytes) */
+		buf[offset++] = 0x02;
+		buf[offset++] = 0x03;
+		buf[offset++] = 0x00;
+		buf[offset++] = ns_info->iso_node_id_len;
+		memcpy(&buf[offset], ns_info->iso_node_id, ns_info->iso_node_id_len);
+		offset += ns_info->iso_node_id_len;
+	}
+
+	/* 更新Local Node Descriptors长度 */
+	uint16_t local_node_len = offset - local_node_len_offset - 2;
+	buf[local_node_len_offset] = (local_node_len >> 8) & 0xFF;
+	buf[local_node_len_offset + 1] = local_node_len & 0xFF;
+
+	/* Save the pre-encoded NLRI length */
+	p->u.prefix_linkstate.nlri_len = (uint16_t)offset;
+	
+	zlog_debug("BGPLS: Node NLRI prepared with pre-encoded nlri_len=%zu", offset);
+	
+	printf("[BGP-LS-NODE] Built Node NLRI: nlri_len=%zu, router_id=%s\n",
+	       offset, inet_ntoa(ns_info->router_id));
+	fflush(stdout);
+	
+	return 0;
+}
+
+/**
+ * 编码Node Attribute TLVs到attr->link_state
+ * 
+ * RFC 7752 Table 7 Node Attribute TLVs:
+ *   - TLV 1024: Node Flag Bits
+ *   - TLV 1026: Node Name
+ *   - TLV 1027: IS-IS Area Identifier
+ *   - TLV 1028: IPv4 Router-ID of Local Node
+ *   - TLV 1029: IPv6 Router-ID of Local Node
+ * 
+ * RFC 9085 SR Node Attribute TLVs:
+ *   - TLV 1034: SR Capabilities
+ *   - TLV 1035: SR Algorithm
+ *   - TLV 1036: SR Local Block
+ *   - TLV 1037: SRMS Preference
+ * 
+ * @param attr      要填充的BGP属性
+ * @param ns_info   节点状态信息源
+ * @param safi      SAFI类型
+ * @return 0 成功, -1 失败
+ */
+static int encode_node_attributes(struct attr *attr, struct nodestate_info *ns_info, safi_t safi)
+{
+	uint8_t *tlv_buf;
+	size_t offset = 0;
+	size_t buf_size = 512;
+	struct bgp_attr_ls *attr_ls;
+	
+	if (!attr || !ns_info) {
+		return -1;
+	}
+	
+	/* 分配TLV缓冲区 */
+	tlv_buf = XCALLOC(MTYPE_BGP_ATTR_LS_DATA, buf_size);
+	if (!tlv_buf) {
+		zlog_err("%s: Failed to allocate TLV buffer", __func__);
+		return -1;
+	}
+	
+	/* TLV 1024: Node Flag Bits (1 byte) */
+	if (ns_info->node_flags != 0) {
+		put_tlv_header_u16(tlv_buf + offset, 1024, 1);
+		tlv_buf[offset + 4] = ns_info->node_flags;
+		offset += 5;
+	}
+	
+	/* TLV 1026: Node Name (variable, max 255 bytes) */
+	if (ns_info->node_name[0] != '\0') {
+		size_t name_len = strlen(ns_info->node_name);
+		if (name_len > 255) name_len = 255;
+		put_tlv_header_u16(tlv_buf + offset, 1026, name_len);
+		memcpy(tlv_buf + offset + 4, ns_info->node_name, name_len);
+		offset += 4 + name_len;
+	}
+	
+	/* TLV 1027: IS-IS Area Identifier (variable) */
+	if (ns_info->isis_area_id_len > 0) {
+		put_tlv_header_u16(tlv_buf + offset, 1027, ns_info->isis_area_id_len);
+		memcpy(tlv_buf + offset + 4, ns_info->isis_area_id, ns_info->isis_area_id_len);
+		offset += 4 + ns_info->isis_area_id_len;
+	}
+	
+	/* TLV 1028: IPv4 Router-ID of Local Node (4 bytes) */
+	if (ns_info->te_router_id.s_addr != 0) {
+		put_tlv_header_u16(tlv_buf + offset, 1028, 4);
+		memcpy(tlv_buf + offset + 4, &ns_info->te_router_id.s_addr, 4);
+		offset += 8;
+	}
+	
+	/* TLV 1029: IPv6 Router-ID of Local Node (16 bytes) */
+	/* 检查IPv6地址是否非零 */
+	bool has_ipv6_router_id = false;
+	for (int i = 0; i < 16; i++) {
+		if (ns_info->te_router_id_v6.s6_addr[i] != 0) {
+			has_ipv6_router_id = true;
+			break;
+		}
+	}
+	if (has_ipv6_router_id) {
+		put_tlv_header_u16(tlv_buf + offset, 1029, 16);
+		memcpy(tlv_buf + offset + 4, &ns_info->te_router_id_v6, 16);
+		offset += 20;
+	}
+	
+	/* RFC 9085 SR Node Attribute TLVs */
+	
+	/* TLV 1034: SR Capabilities */
+	if (ns_info->srgb_range > 0) {
+		/* SR Capabilities TLV format:
+		 * - Flags (1 byte)
+		 * - Reserved (1 byte)
+		 * - Range Size (3 bytes)
+		 * - SID/Label Sub-TLV (TLV 1161, 7 bytes for label)
+		 */
+		size_t sr_cap_len = 2 + 3 + 7;  /* flags+reserved + range + SID/Label sub-TLV */
+		put_tlv_header_u16(tlv_buf + offset, 1034, sr_cap_len);
+		offset += 4;
+		
+		tlv_buf[offset++] = ns_info->sr_capability_flags;  /* Flags */
+		tlv_buf[offset++] = 0;  /* Reserved */
+		
+		/* Range Size (3 bytes) */
+		tlv_buf[offset++] = (ns_info->srgb_range >> 16) & 0xFF;
+		tlv_buf[offset++] = (ns_info->srgb_range >> 8) & 0xFF;
+		tlv_buf[offset++] = ns_info->srgb_range & 0xFF;
+		
+		/* SID/Label Sub-TLV (Type 1161, Length 3 for label) */
+		put_tlv_header_u16(tlv_buf + offset, 1161, 3);
+		offset += 4;
+		tlv_buf[offset++] = (ns_info->srgb_base >> 12) & 0xFF;
+		tlv_buf[offset++] = (ns_info->srgb_base >> 4) & 0xFF;
+		tlv_buf[offset++] = (ns_info->srgb_base << 4) & 0xF0;
+	}
+	
+	/* TLV 1035: SR Algorithm */
+	if (ns_info->sr_algorithm_count > 0) {
+		put_tlv_header_u16(tlv_buf + offset, 1035, ns_info->sr_algorithm_count);
+		memcpy(tlv_buf + offset + 4, ns_info->sr_algorithms, ns_info->sr_algorithm_count);
+		offset += 4 + ns_info->sr_algorithm_count;
+	}
+	
+	/* TLV 1036: SR Local Block */
+	if (ns_info->srlb_range > 0) {
+		size_t srlb_len = 2 + 3 + 7;
+		put_tlv_header_u16(tlv_buf + offset, 1036, srlb_len);
+		offset += 4;
+		
+		tlv_buf[offset++] = 0;  /* Flags */
+		tlv_buf[offset++] = 0;  /* Reserved */
+		
+		/* Range Size (3 bytes) */
+		tlv_buf[offset++] = (ns_info->srlb_range >> 16) & 0xFF;
+		tlv_buf[offset++] = (ns_info->srlb_range >> 8) & 0xFF;
+		tlv_buf[offset++] = ns_info->srlb_range & 0xFF;
+		
+		/* SID/Label Sub-TLV */
+		put_tlv_header_u16(tlv_buf + offset, 1161, 3);
+		offset += 4;
+		tlv_buf[offset++] = (ns_info->srlb_base >> 12) & 0xFF;
+		tlv_buf[offset++] = (ns_info->srlb_base >> 4) & 0xFF;
+		tlv_buf[offset++] = (ns_info->srlb_base << 4) & 0xF0;
+	}
+	
+	/* TLV 1037: SRMS Preference */
+	if (ns_info->srms_preference != 0) {
+		put_tlv_header_u16(tlv_buf + offset, 1037, 1);
+		tlv_buf[offset + 4] = ns_info->srms_preference;
+		offset += 5;
+	}
+	
+	/* 如果没有任何TLV，至少编码Node Name */
+	if (offset == 0 && ns_info->node_name[0] == '\0') {
+		XFREE(MTYPE_BGP_ATTR_LS_DATA, tlv_buf);
+		zlog_warn("encode_node_attributes: No attributes to encode");
+		return -1;
+	}
+	
+	/* 分配并填充bgp_attr_ls结构 */
+	attr_ls = XCALLOC(MTYPE_BGP_ATTR_LS, sizeof(struct bgp_attr_ls));
+	if (!attr_ls) {
+		XFREE(MTYPE_BGP_ATTR_LS_DATA, tlv_buf);
+		zlog_err("%s: Failed to allocate attr_ls", __func__);
+		return -1;
+	}
+	
+	attr_ls->length = offset;
+	attr_ls->data = tlv_buf;
+	attr_ls->refcnt = 0;
+	
+	attr->link_state = attr_ls;
+	
+	printf("[BGP-LS-NODE] Encoded %zu bytes of Node Attribute TLVs\n", offset);
+	fflush(stdout);
+	
+	return 0;
+}
+
+/**
+ * 添加新的节点状态到 BGP-LS RIB
+ * 
+ * @param bgp       BGP实例
+ * @param ns_info   节点状态信息
+ * @param safi      SAFI类型
+ * @return 0 成功, -1 失败
+ */
+int nodestate_add(struct bgp *bgp, struct nodestate_info *ns_info, safi_t safi)
+{
+	struct prefix p;
+	struct attr attr;
+	struct attr *attr_new;
+	struct bgp_dest *dest;
+	struct bgp_path_info *pi;
+	
+	if (!bgp || !ns_info) {
+		return -1;
+	}
+	
+	printf("[BGP-LS-NODE-ADD] Adding node: %s (router_id=%s)\n",
+	       ns_info->node_name, inet_ntoa(ns_info->router_id));
+	fflush(stdout);
+	
+	/* 1: 构造BGP-LS Node NLRI前缀 */
+	memset(&p, 0, sizeof(p));
+	if (build_bgpls_node_nlri(&p, ns_info) != 0) {
+		return -1;
+	}
+	
+	/* 2: 构造BGP属性（Node Attributes） */
+	bgp_attr_default_set(&attr, bgp, BGP_ORIGIN_IGP);
+	attr.flag |= ATTR_FLAG_BIT(BGP_ATTR_LINK_STATE);
+	
+	if (encode_node_attributes(&attr, ns_info, safi) != 0) {
+		return -1;
+	}
+	
+	/* 3: Intern属性 */
+	attr_new = bgp_attr_intern(&attr);
+	
+	/* 4: 获取或创建BGP RIB节点 */
+	struct bgp_table *table = bgp->rib[AFI_LINKSTATE][safi];
+	if (!table) {
+		table = bgp_table_init(bgp, AFI_LINKSTATE, safi);
+		if (!table) {
+			return -1;
+		}
+		bgp->rib[AFI_LINKSTATE][safi] = table;
+	}
+	
+	dest = bgp_node_get(table, &p);
+	if (!dest) {
+		printf("[BGP-LS-NODE-ERROR] bgp_node_get returned NULL!\n");
+		fflush(stdout);
+		return -1;
+	}
+
+	/* 5: 创建BGP路径信息 */
+	/* 注意: attr_new 已在上面 intern，不要重复调用 */
+	
+	pi = info_make(ZEBRA_ROUTE_BGP,
+	               BGP_ROUTE_STATIC,
+	               0,
+	               bgp->peer_self,
+	               attr_new,
+	               dest);
+	
+	if (!pi) {
+		zlog_warn("nodestate_add: Failed to create path_info");
+		bgp_dest_unlock_node(dest);
+		bgp_attr_unintern(&attr_new);
+		return -1;
+	}
+	
+	SET_FLAG(pi->flags, BGP_PATH_VALID);
+	SET_FLAG(pi->flags, BGP_PATH_ATTR_CHANGED);
+	
+	bgp_path_info_add(dest, pi);
+	bgp_process(bgp, dest, pi, AFI_LINKSTATE, safi);
+	
+	/* 6: 插入哈希表映射 */
+	if (!bgp->nodestate_map) {
+		bgp_nodestate_map_init(bgp);
+	}
+	
+	struct nodestate_prefix_wrapper wrapper_key;
+	memset(&wrapper_key, 0, sizeof(wrapper_key));
+	strncpy(wrapper_key.node_name, ns_info->node_name, sizeof(wrapper_key.node_name) - 1);
+	memcpy(&wrapper_key.ns_info, ns_info, sizeof(wrapper_key.ns_info));
+	wrapper_key.dest = dest;
+	
+	struct nodestate_prefix_wrapper *wrapper_result;
+	wrapper_result = hash_get(bgp->nodestate_map, &wrapper_key, nodestate_map_alloc);
+	if (wrapper_result) {
+		wrapper_result->dest = dest;
+	}
+	
+	printf("[BGP-LS-NODE-ADD] Successfully added node: %s\n", ns_info->node_name);
+	fflush(stdout);
+	
+	return 0;
+}
+
+/**
+ * 更新已存在的节点状态
+ * 
+ * @param bgp       BGP实例
+ * @param ns_info   新的节点状态信息
+ * @param safi      SAFI类型
+ * @return 0 成功, -1 失败
+ */
+int nodestate_update(struct bgp *bgp, struct nodestate_info *ns_info, safi_t safi)
+{
+	struct bgp_dest *dest;
+	struct bgp_path_info *pi;
+	struct attr new_attr;
+	struct attr *attr_new;
+	
+	if (!bgp || !ns_info) {
+		return -1;
+	}
+	
+	printf("[BGP-LS-NODE-UPDATE] Updating node: %s\n", ns_info->node_name);
+	fflush(stdout);
+	
+	/* 1: 确保hash table已初始化 */
+	if (!bgp->nodestate_map) {
+		bgp_nodestate_map_init(bgp);
+	}
+	
+	/* 2: 从hash table查找 */
+	struct nodestate_prefix_wrapper lookup_key;
+	memset(&lookup_key, 0, sizeof(lookup_key));
+	strncpy(lookup_key.node_name, ns_info->node_name, sizeof(lookup_key.node_name) - 1);
+	
+	struct nodestate_prefix_wrapper *mapping = hash_lookup(bgp->nodestate_map, &lookup_key);
+	
+	if (!mapping || !mapping->dest) {
+		/* 不存在，调用add */
+		printf("[BGP-LS-NODE-UPDATE] Node not found, calling nodestate_add\n");
+		fflush(stdout);
+		return nodestate_add(bgp, ns_info, safi);
+	}
+	
+	dest = mapping->dest;
+	
+	/* 增加引用计数，防止在操作过程中被释放 */
+	bgp_dest_lock_node(dest);
+	
+	pi = bgp_dest_get_bgp_path_info(dest);
+	if (!pi) {
+		bgp_dest_unlock_node(dest);
+		return nodestate_add(bgp, ns_info, safi);
+	}
+	
+	/* 3: 构造新属性 */
+	memset(&new_attr, 0, sizeof(new_attr));
+	bgp_attr_default_set(&new_attr, bgp, BGP_ORIGIN_IGP);
+	new_attr.flag |= ATTR_FLAG_BIT(BGP_ATTR_LINK_STATE);
+	
+	if (encode_node_attributes(&new_attr, ns_info, safi) != 0) {
+		bgp_dest_unlock_node(dest);
+		return -1;
+	}
+	
+	/* 4: Intern新属性 */
+	attr_new = bgp_attr_intern(&new_attr);
+	
+	/* 5: 检查是否变化 */
+	if (attrhash_cmp(pi->attr, attr_new)) {
+		printf("[BGP-LS-NODE-UPDATE] Attributes unchanged\n");
+		fflush(stdout);
+		bgp_attr_unintern(&attr_new);
+		bgp_dest_unlock_node(dest);
+		return 0;
+	}
+	
+	/* 6: 更新属性 */
+	struct attr *old_attr = pi->attr;
+	pi->attr = attr_new;
+	pi->uptime = monotime(NULL);
+	SET_FLAG(pi->flags, BGP_PATH_ATTR_CHANGED);
+	bgp_attr_unintern(&old_attr);
+	
+	/* 7: 触发处理 */
+	bgp_process(bgp, dest, pi, AFI_LINKSTATE, safi);
+	bgp_dest_unlock_node(dest);
+	
+	printf("[BGP-LS-NODE-UPDATE] Update completed for node: %s\n", ns_info->node_name);
+	fflush(stdout);
+	
+	return 0;
+}
+
+/**
+ * 删除节点状态（撤销通告）
+ * 
+ * @param bgp       BGP实例
+ * @param node_name 节点名称
+ * @param safi      SAFI类型
+ * @return 0 成功, -1 失败
+ */
+int nodestate_delete(struct bgp *bgp, const char *node_name, safi_t safi)
+{
+	struct bgp_dest *dest;
+	struct bgp_path_info *pi;
+	
+	if (!bgp || !node_name) {
+		return -1;
+	}
+	
+	printf("[BGP-LS-NODE-DELETE] Deleting node: %s\n", node_name);
+	fflush(stdout);
+	
+	if (!bgp->nodestate_map) {
+		zlog_err("%s: nodestate_map not initialized", __func__);
+		return -1;
+	}
+	
+	/* 1: 从哈希表查找 */
+	struct nodestate_prefix_wrapper lookup_key;
+	memset(&lookup_key, 0, sizeof(lookup_key));
+	strncpy(lookup_key.node_name, node_name, sizeof(lookup_key.node_name) - 1);
+	
+	struct nodestate_prefix_wrapper *wrapper;
+	wrapper = hash_lookup(bgp->nodestate_map, &lookup_key);
+	
+	if (!wrapper || !wrapper->dest) {
+		zlog_warn("%s: Cannot find node %s in hash map", __func__, node_name);
+		return -1;
+	}
+	
+	dest = wrapper->dest;
+	
+	/* 增加引用计数，防止在 bgp_process 异步处理过程中被释放 */
+	bgp_dest_lock_node(dest);
+	
+	pi = bgp_dest_get_bgp_path_info(dest);
+	if (!pi) {
+		zlog_warn("%s: No path_info for %s", __func__, node_name);
+		bgp_dest_unlock_node(dest);
+		return -1;
+	}
+	
+	/* 2: 标记删除 */
+	struct prefix *p = (struct prefix *)bgp_dest_get_prefix(dest);
+	if (p && p->family == AF_LINKSTATE) {
+		p->u.prefix_linkstate.ls_data = NULL;
+	}
+	
+	bgp_path_info_mark_for_delete(dest, pi);
+	bgp_process(bgp, dest, pi, AFI_LINKSTATE, safi);
+	
+	/* 释放我们持有的引用 */
+	bgp_dest_unlock_node(dest);
+	
+	/* 3: 从哈希表删除 */
+	wrapper = hash_release(bgp->nodestate_map, &lookup_key);
+	if (wrapper) {
+		XFREE(MTYPE_BGP_NODESTATE_WRAPPER, wrapper);
+	}
+	
+	printf("[BGP-LS-NODE-DELETE] Delete completed for node: %s\n", node_name);
+	fflush(stdout);
+	
 	return 0;
 }
 

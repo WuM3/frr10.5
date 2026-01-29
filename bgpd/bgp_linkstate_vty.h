@@ -6,6 +6,10 @@
 #ifndef _FRR_BGP_LINKSTATE_VTY_H
 #define _FRR_BGP_LINKSTATE_VTY_H
 
+struct vty;
+struct bgp;
+
 void bgp_linkstate_vty_init(void);
+void bgp_config_write_linkstate(struct vty *vty, struct bgp *bgp);
 
 #endif /* _FRR_BGP_LINKSTATE_VTY_H */
