@@ -2026,23 +2026,23 @@ DEFUN(no_linkstate_monitor,
 	return CMD_SUCCESS;
 }
 
-DEFUN(linkstate_poll_interval,
-      linkstate_poll_interval_cmd,
-      "linkstate poll-interval (10-3600)",
-      "Link-state information\n"
-      "Set polling interval\n"
-      "Interval in seconds\n")
-{
-	VTY_DECLVAR_CONTEXT(bgp, bgp);
-	int idx = 0;
-	uint32_t interval;
+// DEFUN(linkstate_poll_interval,
+//       linkstate_poll_interval_cmd,
+//       "linkstate poll-interval (10-3600)",
+//       "Link-state information\n"
+//       "Set polling interval\n"
+//       "Interval in seconds\n")
+// {
+// 	VTY_DECLVAR_CONTEXT(bgp, bgp);
+// 	int idx = 0;
+// 	uint32_t interval;
 
-	argv_find(argv, argc, "(10-3600)", &idx);
-	interval = strtoul(argv[idx]->arg, NULL, 10);
+// 	argv_find(argv, argc, "(10-3600)", &idx);
+// 	interval = strtoul(argv[idx]->arg, NULL, 10);
 
-	bgp_linkstate_set_poll_interval(bgp, interval);
-	return CMD_SUCCESS;
-}
+// 	bgp_linkstate_set_poll_interval(bgp, interval);
+// 	return CMD_SUCCESS;
+// }
 
 DEFUN(linkstate_monitor_interface,
       linkstate_monitor_interface_cmd,
@@ -2131,7 +2131,7 @@ void bgp_linkstate_poll_init(void)
 	/* Install VTY commands */
 	install_element(BGP_NODE, &linkstate_monitor_cmd);
 	install_element(BGP_NODE, &no_linkstate_monitor_cmd);
-	install_element(BGP_NODE, &linkstate_poll_interval_cmd);
+	// install_element(BGP_NODE, &linkstate_poll_interval_cmd);
 	install_element(BGP_NODE, &linkstate_monitor_interface_cmd);
 	install_element(BGP_NODE, &linkstate_udp_server_cmd);
 	install_element(BGP_NODE, &no_linkstate_udp_server_cmd);
